@@ -1,0 +1,282 @@
+
+!yamlable/com.project24.schema.AppGraph
+name: amazon
+description: Amazon shopping web site; you can buy pretty much anything here.
+endpoint: https://www.amazon.com
+variables: !yamlable/com.project24.schema.Variables
+  variables: {}
+plugins: []
+atoms:
+- &id001 !yamlable/com.project24.schema.Atom
+  id: search_bar
+  description: search bar for products
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Search Amazon
+    match_type: exact
+    where: textbox
+    element_id: ''
+  - !yamlable/com.project24.schema.TextMarker
+    text: amazon.com
+    match_type: substring
+    where: url
+    element_id: ''
+  element_ids: []
+- &id002 !yamlable/com.project24.schema.Atom
+  id: search_result
+  description: result of product search
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Results
+    match_type: exact
+    where: text
+    element_id: ''
+  - !yamlable/com.project24.schema.TextMarker
+    text: Check each product page for other buying option
+    match_type: exact
+    where: text
+    element_id: ''
+  element_ids: []
+- &id004 !yamlable/com.project24.schema.Atom
+  id: add_to_cart
+  description: adds item to cart
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Add To Cart
+    match_type: exact
+    where: button
+    element_id: ''
+  element_ids: []
+- &id005 !yamlable/com.project24.schema.Atom
+  id: buy_now
+  description: buys an item
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Buy Now
+    match_type: exact
+    where: button
+    element_id: ''
+  element_ids: []
+- &id003 !yamlable/com.project24.schema.Atom
+  id: item_details
+  description: show detail information such as its price and reviews of an item
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: About this item
+    match_type: exact
+    where: text
+    element_id: ''
+  element_ids: []
+- &id006 !yamlable/com.project24.schema.Atom
+  id: checkout
+  description: checkout the current cart
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Proceed to checkout
+    match_type: prefix
+    where: button
+    element_id: ''
+  element_ids: []
+- &id007 !yamlable/com.project24.schema.Atom
+  id: added_to_cart
+  description: confirmation of adding to cart
+  markers:
+  - !yamlable/com.project24.schema.TextMarker
+    text: Added to Cart
+    match_type: substring
+    where: text
+    element_id: ''
+  element_ids: []
+states:
+- &id008 !yamlable/com.project24.schema.State
+  id: home_page
+  url: ''
+  description: Amazon.com home page.
+  atoms:
+  - *id001
+- &id009 !yamlable/com.project24.schema.State
+  id: search_result
+  url: ''
+  description: page showing a list of search results
+  atoms:
+  - *id002
+- &id010 !yamlable/com.project24.schema.State
+  id: item_details
+  url: ''
+  description: page showing detaisl of a selected item
+  atoms:
+  - *id003
+  - *id004
+  - *id005
+- &id011 !yamlable/com.project24.schema.State
+  id: proceed_to_checkout
+  url: ''
+  description: Confirms addition to cart and proceeds to checkout
+  atoms:
+  - *id006
+  - *id007
+verbs:
+- !yamlable/com.project24.schema.Verb
+  name: go_home
+  description: navigate to amazon home page
+  src_atom: null
+  src_state: null
+  dst_atom: *id001
+  dst_state: *id008
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: goto
+    input:
+    - https://www.amazon.com
+    output: null
+    selector: []
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: search
+  description: searches for a product in Amazon
+  src_atom: *id001
+  src_state: null
+  dst_atom: *id002
+  dst_state: *id009
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: fill
+    input:
+    - '@product_name'
+    output: null
+    selector:
+    - marker:Search Amazon
+    element_id: null
+    locator: null
+  - !yamlable/com.project24.schema.Action
+    type: press
+    input:
+    - Enter
+    output: null
+    selector:
+    - marker:Search Amazon
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: select_result
+  description: select the first search result
+  src_atom: *id002
+  src_state: *id009
+  dst_atom: *id003
+  dst_state: *id010
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: click
+    input: []
+    output: null
+    selector:
+    - img:below(:text("Check each product page for other buying options."))
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: filter_min_price
+  description: set the minimum price filter. Value should be set to min price - 1, and no less than 0
+  src_atom: *id002
+  src_state: *id009
+  dst_atom: *id002
+  dst_state: *id009
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: fill
+    input: 
+    - '@minimum_price'
+    output: null
+    selector:
+    - get_by_role("slider", name='Minimum')
+    element_id: null
+    locator: null
+  - !yamlable/com.project24.schema.Action
+    type: click
+    input: []
+    output: null
+    selector:
+    - get_by_label("Go - Submit price range")
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: filter_max_price
+  description: set the maximum price filter. Value should be set to max price - 1
+  src_atom: *id002
+  src_state: *id009
+  dst_atom: *id002
+  dst_state: *id009
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: fill
+    input: 
+    - '@maximum_price_minus_1'
+    output: null
+    selector:
+    - get_by_role("slider", name='Maximum')
+    element_id: null
+    locator: null
+  - !yamlable/com.project24.schema.Action
+    type: click
+    input: []
+    output: null
+    selector:
+    - get_by_label("Go - Submit price range")
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: get_price
+  description: Reads the price of the item shown in this page. No side-effects
+  src_atom: *id003
+  src_state: *id010
+  dst_atom: *id003
+  dst_state: *id010
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: read_text
+    input: []
+    output: null
+    selector:
+    - '#corePrice_feature_div > div > div > span.a-price.aok-align-center > span.a-offscreen'
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: get_product_name
+  description: Reads the name of the item shown in this page. No side-effects
+  src_atom: *id003
+  src_state: *id010
+  dst_atom: *id003
+  dst_state: *id010
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: read_text
+    input: []
+    output: null
+    selector:
+    - '#productTitle'
+    element_id: null
+    locator: null
+- !yamlable/com.project24.schema.Verb
+  name: add_to_cart
+  description: Adds the item on the current page to cart
+  src_atom: *id003
+  src_state: *id010
+  dst_atom: *id007
+  dst_state: *id011
+  dst_url: null
+  actions:
+  - !yamlable/com.project24.schema.Action
+    type: click
+    input: []
+    output: null
+    selector:
+    - marker:Add to Cart
+    element_id: null
+    locator: null
