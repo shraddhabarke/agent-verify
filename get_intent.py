@@ -13,3 +13,13 @@ class Intents:
             
     def loc(self, i):
         return self.intents[i]['ques']
+    
+    def filter(self, fields, values):
+        delete_indices = []
+        for i in range(len(self.intents)):
+            for field, value in zip(fields, values):
+                if self.intents[i][field] != value:
+                    delete_indices.append(i)
+
+        for i in range(len(delete_indices)):
+            del self.intents[delete_indices[len(delete_indices)-i-1]]
