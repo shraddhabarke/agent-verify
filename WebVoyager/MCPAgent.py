@@ -273,8 +273,8 @@ if __name__ == "__main__":
         task_data = [json.loads(line) for line in f if line.strip()]
 
     agent = Agent()
-    user_input = 'Search for a popular Pasta Sauce with more than 1000 reviews and a rating above 4 stars. Create a shopping list of ingredients for this recipe.'
-    result = asyncio.run(agent.execute_task(mcp_server, user_input))
+    #user_input = 'Search for a popular Pasta Sauce with more than 1000 reviews and a rating above 4 stars. Create a shopping list of ingredients for this recipe.'
+    #result = asyncio.run(agent.execute_task(mcp_server, user_input))
     
     count = task_count
     for task in task_data:
