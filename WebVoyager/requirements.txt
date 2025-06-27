@@ -1,0 +1,5 @@
+openai
+azure-identity
+fastmcp
+python-dotenv
+beautifulsoup4
