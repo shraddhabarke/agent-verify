@@ -10,17 +10,65 @@ import traceback
 import re
 import sys
 
+from azure.ai.inference import ChatCompletionsClient
+from azure.identity import DefaultAzureCredential, ChainedTokenCredential, AzureCliCredential
+import os
+
 # An AI agent that uses Azure OpenAI to call functions from a MCP server
 class Agent:
-    def __init__(self):
-        load_dotenv()
-        self.llm_client = AzureOpenAI(
-            api_version="2024-05-01-preview",
-            azure_endpoint=os.environ['OPENAI_ENDPOINT'],
-            azure_ad_token_provider=get_bearer_token_provider(
-                AzureCliCredential(),
-                "https://cognitiveservices.azure.com/.default"
+    # def __init__(self):
+    #     load_dotenv()
+    #     self.llm_client = AzureOpenAI(
+    #         api_version="2024-05-01-preview",
+    #         azure_endpoint=os.environ['OPENAI_ENDPOINT'],
+    #         azure_ad_token_provider=get_bearer_token_provider(
+    #             AzureCliCredential(),
+    #             "https://cognitiveservices.azure.com/.default"
+    #         )
+    #     )
+    
+    def __init__(
+            self,
+            api_version = '2025-03-01-preview',  # Ensure this is a valid API version see: https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation#latest-ga-api-release
+            model_name = 'gpt-4o',  # Ensure this is a valid model name
+            model_version = '2024-11-20',  # Ensure this is a valid model version
+            deployment_name = "gpt-4o_2024-11-20", #re.sub(r'[^a-zA-Z0-9-_]', '', f'{model_name}_{model_version}')  # If your Endpoint doesn't have harmonized deployment names, you can use the deployment name directly: see: https://aka.ms/trapi/models
+    ):
+        self.credential = ChainedTokenCredential(
+            AzureCliCredential(),
+            DefaultAzureCredential(
+                exclude_cli_credential=True,
+                # Exclude other credentials we are not interested in.
+                exclude_environment_credential=True,
+                exclude_shared_token_cache_credential=True,
+                exclude_developer_cli_credential=True,
+                exclude_powershell_credential=True,
+                exclude_interactive_browser_credential=True,
+                exclude_visual_studio_code_credentials=True,
+                # DEFAULT_IDENTITY_CLIENT_ID is a variable exposed in
+                # Azure ML Compute jobs that has the client id of the
+                # user-assigned managed identity in it.
+                # See https://learn.microsoft.com/en-us/azure/machine-learning/how-to-identity-based-service-authentication#compute-cluster
+                # In case it is not set the ManagedIdentityCredential will
+                # default to using the system-assigned managed identity, if any.
+                managed_identity_client_id=os.environ.get("DEFAULT_IDENTITY_CLIENT_ID"),
             )
+        )
+        self.scopes = ["api://trapi/.default"]
+
+        # Note: Check out the other model deployments here - https://dev.azure.com/msresearch/TRAPI/_wiki/wikis/TRAPI.wiki/15124/Deployment-Model-Information
+        self.api_version = api_version
+        self.model_name = model_name
+        self.model_version = model_version
+        self.deployment_name = deployment_name
+        self.instance = "redmond/interactive/openai" #'gcr/shared/openai' # See https://aka.ms/trapi/models for the instance name
+        self.endpoint = f'https://trapi.research.microsoft.com/{self.instance}/deployments/'+self.deployment_name
+
+        self.llm_client = ChatCompletionsClient(
+            endpoint=self.endpoint,
+            credential=self.credential,
+            credential_scopes=self.scopes,
+            api_version=self.api_version
         )
 
     def get_tool_description(self, tool):
@@ -41,13 +89,31 @@ class Agent:
         desc = f"-{tool.name}({param_str}): {tool.description}"
         return desc
     
+    # def call_llm(self, system_prompt, user_prompt, max_tokens=1000):
+    #     """
+    #     Send the prompt to Azure OpenAI (GPT-4o) and handle token counting.
+    #     Returns the text output from the model.
+    #     """
+    #     response = self.llm_client.chat.completions.create(
+    #         model=os.environ['OPENAI_TEXT_MODEL'],
+    #         messages=[
+    #             {"role": "system", "content": system_prompt},
+    #             {"role": "user", "content": user_prompt},
+    #         ],
+    #         max_tokens=max_tokens,
+    #     )
+
+    #     completion = response.choices[0].message.content.strip()
+
+    #     return completion
+    
     def call_llm(self, system_prompt, user_prompt, max_tokens=1000):
         """
-        Send the prompt to Azure OpenAI (GPT-4o) and handle token counting.
+        Send the prompt to LLM and handle token counting.
         Returns the text output from the model.
         """
-        response = self.llm_client.chat.completions.create(
-            model=os.environ['OPENAI_TEXT_MODEL'],
+        response = self.llm_client.complete(
+            model=self.model_name,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -265,7 +331,7 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
 if __name__ == "__main__":
     task_file = 'WebVoyager_data.jsonl'
     task_filter = 'Allrecipes'
-    task_count = 100 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
+    task_count = 1 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     mcp_server = 'AllRecipes.py'
 
 
@@ -284,7 +350,7 @@ if __name__ == "__main__":
             break
 
         print(task['id'])
-        log_file = f"logs/log_{task['id']}.txt"
+        log_file = f"new_logs/log_{task['id']}.txt"
         if os.path.exists(log_file):
             continue
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
