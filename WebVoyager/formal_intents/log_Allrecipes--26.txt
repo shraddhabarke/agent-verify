@@ -1,0 +1,34 @@
+Executing task: Search for a high-protein vegetarian chili recipe on Allrecipes that has at least 50 reviews and a rating of 4 stars or higher. Provide the ingredient list, cooking time, and a brief description of the cooking steps.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegetarian chili",
+            "comparison": "contains"
+        },
+        "description": {
+            "value": "high-protein",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": null,
+            "comparison": "include"
+        },
+        "total_time": {
+            "value": null,
+            "comparison": "provide"
+        },
+        "directions": {
+            "value": "brief",
+            "comparison": "summarize"
+        }
+    }
+}

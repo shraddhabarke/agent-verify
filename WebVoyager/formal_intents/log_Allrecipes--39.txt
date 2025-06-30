@@ -1,0 +1,28 @@
+Executing task: Locate a recipe for sushi rolls on Allrecipes with a minimum of 20 reviews. Show the Nutrition Facts and the main ingredients. Tell me how to store these rolls.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "sushi rolls",
+            "comparison": "="
+        },
+        "review_count": {
+            "value": 20,
+            "comparison": ">="
+        }
+    },
+    "output": {
+        "main": [
+            "ingredients",
+            "nutrition facts"
+        ],
+        "additional_info": {
+            "storage_instructions": {
+                "value": "sushi rolls storage",
+                "comparison": "="
+            }
+        }
+    }
+}
+```

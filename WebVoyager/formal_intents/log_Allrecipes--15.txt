@@ -1,0 +1,33 @@
+Executing task: Choose a dessert recipe on Allrecipes with a prep time of less than 30 minutes, has chocolate as an ingredient, and has a user rating of 4 stars or higher. Provide the name of the recipe, ingredients list, and step-by-step instructions.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "any",
+            "comparison": "exists"
+        },
+        "prep time": {
+            "value": 30,
+            "comparison": "<"
+        },
+        "ingredients": {
+            "value": "chocolate",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "directions": {
+            "value": "any",
+            "comparison": "exists"
+        }
+    },
+    "response_fields": [
+        "title",
+        "ingredients",
+        "directions"
+    ]
+}
+```

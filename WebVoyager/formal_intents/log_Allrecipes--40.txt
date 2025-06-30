@@ -1,0 +1,16 @@
+Executing task: Browse the about us section of Allrecipes for a brief introduction to The Allrecipes Allstars.
+```json
+{
+    "object": "about us section",
+    "properties": {
+        "title": {
+            "value": "The Allrecipes Allstars",
+            "comparison": "="
+        },
+        "description": {
+            "value": "brief introduction",
+            "comparison": "="
+        }
+    }
+}
+```

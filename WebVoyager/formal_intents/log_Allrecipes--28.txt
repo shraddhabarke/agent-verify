@@ -1,0 +1,40 @@
+Executing task: On Allrecipes, find a vegan brownie recipe that has at least 40 reviews and a rating of 4.5 or higher. Include the list of ingredients, total prep and cook time, and a brief overview of the preparation steps.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegan brownie",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 40,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": "any",
+            "comparison": "included"
+        },
+        "prep time": {
+            "value": "any",
+            "comparison": "included"
+        },
+        "cook time": {
+            "value": "any",
+            "comparison": "included"
+        },
+        "total time": {
+            "value": "any",
+            "comparison": "included"
+        },
+        "directions": {
+            "value": "brief overview",
+            "comparison": "included"
+        }
+    }
+}
+```

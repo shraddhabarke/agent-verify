@@ -1,0 +1,29 @@
+Executing task: Find The Most Popular Recipes of the 1960s, noting the recipe name, preparation time and total time of the second recipe in this collection.
+```json
+{
+    "object": "recipe",
+    "collection": {
+        "title": "Most Popular Recipes of the 1960s"
+    },
+    "properties": {
+        "position": {
+            "value": 2,
+            "comparison": "="
+        }
+    },
+    "output": {
+        "title": {
+            "value": null,
+            "comparison": "return"
+        },
+        "prep time": {
+            "value": null,
+            "comparison": "return"
+        },
+        "total time": {
+            "value": null,
+            "comparison": "return"
+        }
+    }
+}
+```

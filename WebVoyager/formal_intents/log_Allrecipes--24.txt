@@ -1,0 +1,30 @@
+Executing task: Locate a recipe for an eggplant Parmesan on Allrecipes with a rating of at least 4.5 stars and over 50 reviews. Include the preparation time and the number of servings provided by the recipe.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "eggplant Parmesan",
+            "comparison": "="
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">"
+        },
+        "prep time": {
+            "value": null,
+            "comparison": "return" 
+        },
+        "servings": {
+            "value": null,
+            "comparison": "return"
+        }
+    }
+}

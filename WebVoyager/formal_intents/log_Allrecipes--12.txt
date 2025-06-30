@@ -1,0 +1,27 @@
+Executing task: Search for a popular cookie recipe on Allrecipes with more than 1000 reviews and a rating of 4.5 stars or better. Provide the list of ingredients needed.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "cookie",
+            "comparison": "contains"
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 1000,
+            "comparison": ">"
+        }
+    },
+    "response": {
+        "fields": ["ingredients"]
+    }
+}
+```

@@ -1,0 +1,26 @@
+Executing task: Find a popular quinoa salad recipe on Allrecipes with more than 500 reviews and a rating above 4 stars. Create a shopping list of ingredients for this recipe and include the total cooking and preparation time.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "quinoa salad",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">"
+        },
+        "review_count": {
+            "value": 500,
+            "comparison": ">"
+        },
+        "ingredients": {
+            "value": "*",
+            "comparison": "list"
+        },
+        "prep time": {
+            "value": "*",
+            "comparison": "total"
+        }
+    }
+}

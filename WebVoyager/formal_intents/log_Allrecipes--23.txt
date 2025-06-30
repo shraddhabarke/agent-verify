@@ -1,0 +1,26 @@
+Executing task: Search Allrecipes for a baked lemon chicken recipe that has a prep time under 45 minutes, with at least a 4.5-star rating based on user reviews, and over 200 reviews. List the primary ingredients required.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "baked lemon chicken",
+            "comparison": "contains"
+        },
+        "prep time": {
+            "value": 45,
+            "comparison": "<"
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review count": {
+            "value": 200,
+            "comparison": ">"
+        },
+        "ingredients": {
+            "value": "list",
+            "comparison": "provide"
+        }
+    }
+}

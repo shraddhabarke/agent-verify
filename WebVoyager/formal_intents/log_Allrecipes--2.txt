@@ -1,0 +1,20 @@
+Executing task: Find a recipe for a vegetarian lasagna under 600 calories per serving that has a prep time of less than 1 hour.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegetarian lasagna",
+            "comparison": "="
+        },
+        "nutrition facts": {
+            "calories per serving": {
+                "value": 600,
+                "comparison": "<"
+            }
+        },
+        "prep time": {
+            "value": "1 hour",
+            "comparison": "<"
+        }
+    }
+}

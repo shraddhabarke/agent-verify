@@ -1,0 +1,20 @@
+Executing task: Search for a recipe that includes "chicken breast" and "quinoa" with preparation time under 30 minutes on Allrecipes.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "ingredients": {
+            "value": ["chicken breast", "quinoa"],
+            "comparison": "includes_all"
+        },
+        "prep time": {
+            "value": 30,
+            "comparison": "<"
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        }
+    }
+}
+```

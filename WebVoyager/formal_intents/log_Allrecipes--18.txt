@@ -1,0 +1,24 @@
+Executing task: Find a recipe for a vegetarian lasagna that has over 300 reviews and an average rating of 4.5 or higher on Allrecipes.
+```json
+{
+    "object": "recipe",
+    "filters": {
+        "title": {
+            "value": "vegetarian lasagna",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 300,
+            "comparison": ">"
+        }
+    },
+    "source": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}
+```

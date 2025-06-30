@@ -1,0 +1,20 @@
+Executing task: List at least 6 holiday recipes sections mentioned in the Occasions section of Allrecipes.
+```json
+{
+    "object": "recipes_sections",
+    "properties": {
+        "title": {
+            "value": "Holiday Recipes",
+            "comparison": "="
+        },
+        "sections_count": {
+            "value": 6,
+            "comparison": ">="
+        },
+        "source": {
+            "value": "Occasions",
+            "comparison": "="
+        }
+    }
+}
+```

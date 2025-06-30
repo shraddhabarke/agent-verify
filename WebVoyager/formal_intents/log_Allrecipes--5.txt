@@ -1,0 +1,24 @@
+Executing task: Search for a popular Pasta Sauce with more than 1000 reviews and a rating above 4 stars. Create a shopping list of ingredients for this recipe.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "Pasta Sauce",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">"
+        },
+        "review_count": {
+            "value": 1000,
+            "comparison": ">"
+        }
+    },
+    "output": {
+        "ingredients": {
+            "value": "generate shopping list",
+            "comparison": "required"
+        }
+    }
+}

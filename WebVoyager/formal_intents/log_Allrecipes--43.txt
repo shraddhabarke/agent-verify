@@ -1,0 +1,19 @@
+Executing task: Find a recipe for a vegan pumpkin pie on Allrecipes with a minimum four-star rating and a total cook time exceeding 1 hour.
+{
+    "title": {
+        "value": "vegan pumpkin pie",
+        "comparison": "="
+    },
+    "rating": {
+        "value": 4,
+        "comparison": ">="
+    },
+    "total time": {
+        "value": "1 hour",
+        "comparison": ">"
+    },
+    "source": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}

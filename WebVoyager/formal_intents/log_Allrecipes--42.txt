@@ -1,0 +1,24 @@
+Executing task: Find a recipe for banana bread with more than 200 reviews and a rating of at least 4.0 stars on Allrecipes.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "banana bread",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.0,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 200,
+            "comparison": ">"
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        }
+    }
+}
+```

@@ -1,0 +1,20 @@
+Executing task: Find a recipe for a vegetarian lasagna that has at least a four-star rating and uses zucchini.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegetarian lasagna",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": "zucchini",
+            "comparison": "contains"
+        }
+    }
+}
+```

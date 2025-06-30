@@ -1,0 +1,22 @@
+Executing task: List 3 recommended dinner recipes in the Allrecipes Dinners section.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "category": {
+            "value": "Dinners",
+            "comparison": "="
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        }
+    },
+    "recommendation": {
+        "count": {
+            "value": 3,
+            "comparison": "="
+        }
+    }
+}
+```

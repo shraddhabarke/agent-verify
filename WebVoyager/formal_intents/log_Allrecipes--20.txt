@@ -1,0 +1,27 @@
+Executing task: Find a recipe for a cauliflower pizza crust that has a preparation time of under 30 minutes and a rating of at least 4 stars on Allrecipes. Include the number of calories per serving.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "cauliflower pizza crust",
+            "comparison": "="
+        },
+        "prep time": {
+            "value": 30,
+            "comparison": "<"
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "nutrition facts": {
+            "key": "calories per serving",
+            "value": "*",
+            "comparison": "include"
+        },
+        "description": {
+            "value": "Allrecipes",
+            "comparison": "originates_from"
+        }
+    }
+}

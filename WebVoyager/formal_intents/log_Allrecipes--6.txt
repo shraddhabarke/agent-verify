@@ -1,0 +1,20 @@
+Executing task: Search for a vegetarian lasagna recipe that has at least a four-star rating and over 500 reviews.
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegetarian lasagna",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 500,
+            "comparison": ">"
+        }
+    }
+}
+```

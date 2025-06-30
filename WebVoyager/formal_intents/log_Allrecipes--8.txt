@@ -1,0 +1,25 @@
+Executing task: Search for a recipe for Beef Wellington on Allrecipes that has at least 200 reviews and an average rating of 4.5 stars or higher. List the main ingredients required for the dish.
+```json
+{
+    "object": "recipe",
+    "source": "Allrecipes",
+    "properties": {
+        "title": {
+            "value": "Beef Wellington",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 200,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": null,
+            "comparison": "list"
+        }
+    }
+}
+```
