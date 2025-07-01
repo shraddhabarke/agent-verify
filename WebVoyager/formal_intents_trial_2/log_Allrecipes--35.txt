@@ -1,0 +1,22 @@
+Executing task: Search for an Italian-style meatball recipe on Allrecipes that has more than 100 reviews. Detail the type of meat used and the overall cooking time required.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "Italian-style meatball",
+            "comparison": "contains"
+        },
+        "review_count": {
+            "value": 100,
+            "comparison": ">"
+        },
+        "ingredients": {
+            "value": "meat",
+            "comparison": "includes"
+        },
+        "total time": {
+            "value": null,
+            "comparison": "required"
+        }
+    }
+}

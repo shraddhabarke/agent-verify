@@ -1,0 +1,30 @@
+Executing task: Search for a seafood paella recipe on Allrecipes with a minimum of 4.5 stars rating and at least 50 reviews. The recipe should include shrimp and mussels. Provide the ingredients, total time, and an overview of the preparation steps.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "seafood paella",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": ["shrimp", "mussels"],
+            "comparison": "includes"
+        },
+        "total_time": {
+            "value": null,
+            "comparison": "retrieve"
+        },
+        "directions": {
+            "value": null,
+            "comparison": "retrieve"
+        }
+    }
+}

@@ -1,0 +1,34 @@
+Executing task: Search for a Greek salad recipe on Allrecipes that has a prep time of under 25 minutes and more than 15 reviews. Include the primary cheese used and the type of dressing recommended.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "Greek salad",
+            "comparison": "="
+        },
+        "prep time": {
+            "value": 25,
+            "comparison": "<"
+        },
+        "review count": {
+            "value": 15,
+            "comparison": ">"
+        },
+        "ingredients": {
+            "description_contains": {
+                "value": "cheese",
+                "operator": "contains"
+            }
+        },
+        "dressing": {
+            "description_contains": {
+                "value": "dressing",
+                "operator": "contains"
+            }
+        }
+    },
+    "platform": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}

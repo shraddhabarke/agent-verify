@@ -1,0 +1,26 @@
+Executing task: Find a recipe for a healthy avocado salad on Allrecipes that has a preparation time of less than 20 minutes and more than 30 user reviews. Include the nutritional information per serving.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "healthy avocado salad",
+            "comparison": "contains"
+        },
+        "prep time": {
+            "value": 20,
+            "comparison": "<"
+        },
+        "review_count": {
+            "value": 30,
+            "comparison": ">"
+        },
+        "nutrition facts": {
+            "value": "per serving",
+            "comparison": "required"
+        }
+    },
+    "source": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}

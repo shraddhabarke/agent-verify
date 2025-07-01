@@ -276,6 +276,7 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
                         print(f"Reason: {explanation}")
                     
                     result = await self.call_mcp_tool(mcp_client, func_name, args)
+                    print(f"Result: {result}")
                 # print(f"Result: {result}")
                 final_result = result
                 
@@ -299,7 +300,7 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
 if __name__ == "__main__":
     task_file = 'WebVoyager_data.jsonl'
     task_filter = 'Allrecipes'
-    task_count = 1 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
+    task_count = 100 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     mcp_server = 'AllRecipes.py'
 
 
@@ -318,7 +319,7 @@ if __name__ == "__main__":
             break
 
         print(task['id'])
-        log_file = f"new_logs/log_{task['id']}.txt"
+        log_file = f"logs_with_results/log_{task['id']}.txt"
         if os.path.exists(log_file):
             continue
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output

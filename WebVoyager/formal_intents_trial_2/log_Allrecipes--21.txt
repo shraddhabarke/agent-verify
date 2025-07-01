@@ -1,0 +1,26 @@
+Executing task: Locate a high-rated recipe for gluten-free brownies on Allrecipes with at least 50 reviews. List the main ingredients and the total time required for preparation and cooking.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "gluten-free brownies",
+            "comparison": "contains"
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "rating": {
+            "value": "high",
+            "comparison": "true"
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">="
+        }
+    },
+    "return": {
+        "ingredients": "main",
+        "total_time": "true"
+    }
+}

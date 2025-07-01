@@ -1,0 +1,22 @@
+Executing task: Find a popular recipe for a chocolate chip cookie and list the ingredients and preparation steps.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "chocolate chip cookie",
+            "comparison": "like"
+        },
+        "rating_count": {
+            "value": 100,
+            "comparison": ">"
+        },
+        "ingredients": {
+            "value": null,
+            "comparison": "retrieve"
+        },
+        "directions": {
+            "value": null,
+            "comparison": "retrieve"
+        }
+    }
+}

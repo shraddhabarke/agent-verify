@@ -1,0 +1,34 @@
+Executing task: Locate a baked salmon recipe on Allrecipes that has at least 50 reviews and a rating of 4.5 stars or higher. Note the primary seasoning or herb used and the estimated cooking time.
+```json
+{
+    "object": "recipe",
+    "filters": {
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "title": {
+            "value": "baked salmon",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">="
+        }
+    },
+    "details": {
+        "primary_seasoning_or_herb": {
+            "value": "primary seasoning or herb",
+            "comparison": "note"
+        },
+        "cook_time": {
+            "value": "estimated cooking time",
+            "comparison": "note"
+        }
+    }
+}
+```

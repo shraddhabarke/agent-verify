@@ -1,0 +1,26 @@
+Executing task: Find a recipe for a low-carb breakfast on Allrecipes with at least 25 reviews. Show the Nutrition Facts and the total carbohydrate content per serving.
+{
+    "object": "recipe",
+    "properties": {
+        "description": {
+            "value": "low-carb breakfast",
+            "comparison": "contains"
+        },
+        "review_count": {
+            "value": 25,
+            "comparison": ">="
+        },
+        "nutrition facts": {
+            "total carbohydrate": {
+                "per serving": {
+                    "value": null,
+                    "comparison": "exists"
+                }
+            }
+        }
+    },
+    "source": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}

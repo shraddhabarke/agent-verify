@@ -1,0 +1,30 @@
+Executing task: Find a French ratatouille recipe on Allrecipes with a 4-star rating or higher and at least 15 reviews. Note the variety of vegetables included and the overall cooking time.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "French ratatouille",
+            "comparison": "="
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 15,
+            "comparison": ">="
+        },
+        "ingredients": {
+            "value": "variety of vegetables",
+            "comparison": "note"
+        },
+        "total_time": {
+            "value": "overall cooking time",
+            "comparison": "note"
+        }
+    }
+}

@@ -1,0 +1,32 @@
+Executing task: Find a vegan lasagna recipe on Allrecipes that requires 10 ingredients or less and has feedback of more than 200 reviews. Provide a brief overview of the ingredient list and the total prep and cook time.
+{
+    "object": "recipe",
+    "properties": {
+        "description": {
+            "value": "vegan lasagna",
+            "comparison": "="
+        },
+        "website": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "ingredients": {
+            "value": 10,
+            "comparison": "<="
+        },
+        "review_count": {
+            "value": 200,
+            "comparison": ">"
+        }
+    },
+    "overview": {
+        "ingredient_list": {
+            "value": "brief overview",
+            "comparison": "provide"
+        },
+        "total_time": {
+            "value": "prep and cook",
+            "comparison": "provide"
+        }
+    }
+}

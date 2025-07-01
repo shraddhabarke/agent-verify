@@ -18,9 +18,10 @@ For each value, you must mention the comparison operator.
 Some of the keys you may need to use are 
 title, rating, rating count, review count, description, prep time, cook time, total time, servings, yield, ingredients, nutrition facts, and directions.
 Do not use any other keys. And do not change their spellings.
+Do not make up any new information.
         '''
         user_prompt = "Provide a recipe for vegetarian lasagna with more than 100 reviews and a rating of at least 4.5 stars suitable for 6 people."
-        response = '''
+        response = f'''
 {{
     "object": "recipe",
     "properties": {{
@@ -50,6 +51,28 @@ Do not use any other keys. And do not change their spellings.
 
         completion = response.choices[0].message.content.strip()
 
+        return completion
+    
+class IntentAlignmentChecker(Agent):
+    def __init__(self):
+        super().__init__()
+
+    def check_intent_alignment(self, output, formal_intent):
+        system_prompt = f'''
+You are an expert at checking intent alignment.
+You will be given a formal intent description and the steps taken by an agent.
+Your task is to check if the steps are aligned with the formal intent description.
+Answer in YES or NO only, followed by a reason.
+'''
+        user_prompt = f"Formal Intent: {formal_intent}\nOutput: {output}"
+        response = self.llm_client.complete(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        completion = response.choices[0].message.content.strip()
         return completion
 
 def parse_log_file(log_text: str) -> dict:
@@ -138,7 +161,7 @@ def get_formal_intent(logs):
     for i in range(len(logs)):
         log = logs[i]
         print(log['filename'])
-        log_file = f"formal_intents/{log['filename']}"
+        log_file = f"formal_intents_trial_2/{log['filename']}"
         if os.path.exists(log_file):
             continue
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
@@ -149,13 +172,21 @@ def get_formal_intent(logs):
         sys.stdout.close()  # Close the suppressed stdout
         sys.stdout = sys.__stdout__  # Restore original stdout
 
+def check_intent_alignment(logs, intents_folder):
+    agent = IntentAlignmentChecker()
+    for i in range(len(logs)):
+        log = logs[i]
+        filename = (log['filename'])
+        intent_file = os.path.join(intents_folder, filename)
+        intent = open(intent_file, encoding="utf-8").read()
+        print(filename, agent.check_intent_alignment(log, intent))
 
 
 def main():
     logs_path = 'logs/'
     logs = get_logs(logs_path)
-    get_formal_intent(logs)
-
+    # get_formal_intent(logs)
+    check_intent_alignment(logs, 'formal_intents_trial_2/')
     
 
 if __name__ == '__main__':

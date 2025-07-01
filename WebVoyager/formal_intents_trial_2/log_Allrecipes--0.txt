@@ -1,0 +1,21 @@
+Executing task: Provide a recipe for vegetarian lasagna with more than 100 reviews and a rating of at least 4.5 stars suitable for 6 people.
+```json
+{
+    "title": {
+        "value": "vegetarian lasagna",
+        "comparison": "="
+    },
+    "rating": {
+        "value": 4.5,
+        "comparison": ">="
+    },
+    "review count": {
+        "value": 100,
+        "comparison": ">"
+    },
+    "servings": {
+        "value": 6,
+        "comparison": "="
+    }
+}
+```

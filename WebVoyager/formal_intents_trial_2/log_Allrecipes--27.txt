@@ -1,0 +1,28 @@
+Executing task: Locate a chicken curry recipe on Allrecipes that has been reviewed more than 30 times and has a rating of at least 4 stars. Provide a summary of the recipe including ingredients, preparation time, and cooking instructions.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "Chicken Curry",
+            "comparison": "="
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 30,
+            "comparison": ">"
+        }
+    },
+    "summary_requested": {
+        "ingredients": true,
+        "prep_time": true,
+        "cook_time": true,
+        "directions": true
+    }
+}

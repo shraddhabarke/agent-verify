@@ -1,0 +1,24 @@
+Executing task: Locate a recipe for an American apple pie on Allrecipes with a rating of at least 4 stars and more than 50 reviews. Note the maximum temperature mentioned in the Directions.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "American apple pie",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 50,
+            "comparison": ">"
+        },
+        "directions": {
+            "temperature": {
+                "value": "maximum",
+                "comparison": "note"
+            }
+        }
+    }
+}

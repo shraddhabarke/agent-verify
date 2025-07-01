@@ -1,0 +1,22 @@
+Executing task: Locate a recipe for vegan chocolate chip cookies with over 60 reviews and a rating of at least 4.5 stars on Allrecipes.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "vegan chocolate chip cookies",
+            "comparison": "="
+        },
+        "rating": {
+            "value": 4.5,
+            "comparison": ">="
+        },
+        "review_count": {
+            "value": 60,
+            "comparison": ">"
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        }
+    }
+}

@@ -1,0 +1,33 @@
+Executing task: Find a high-rated beef stew recipe on Allrecipes that requires a slow cooker and has at least 30 reviews. Detail the cooking time and the first five ingredients listed in the recipe.
+{
+    "object": "recipe",
+    "source": "Allrecipes",
+    "properties": {
+        "title": {
+            "value": "beef stew",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": "high",
+            "comparison": "="
+        },
+        "review_count": {
+            "value": 30,
+            "comparison": ">="
+        },
+        "directions": {
+            "value": "slow cooker",
+            "comparison": "contains"
+        }
+    },
+    "output": {
+        "cook_time": {
+            "value": null,
+            "comparison": "="
+        },
+        "ingredients": {
+            "value": "first five",
+            "comparison": "="
+        }
+    }
+}

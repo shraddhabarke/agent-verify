@@ -1,0 +1,19 @@
+Executing task: Discover a suitable chocolate cupcake recipe on Allrecipes that has a preparation time of under 1 hour and at least 100 user reviews.
+{
+    "object": "recipe",
+    "source": "Allrecipes",
+    "properties": {
+        "title": {
+            "value": "chocolate cupcake",
+            "comparison": "="
+        },
+        "prep time": {
+            "value": "1 hour",
+            "comparison": "<"
+        },
+        "review_count": {
+            "value": 100,
+            "comparison": ">="
+        }
+    }
+}

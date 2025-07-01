@@ -1,0 +1,30 @@
+Executing task: Find a five-star rated chocolate chip cookie recipe that takes less than 1 hour to make on Allrecipes. Note how many reviews the recipe has and the main ingredients required.
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "chocolate chip cookie",
+            "comparison": "contains"
+        },
+        "rating": {
+            "value": 5,
+            "comparison": "="
+        },
+        "total_time": {
+            "value": 60,
+            "comparison": "<"
+        },
+        "review_count": {
+            "value": null,
+            "comparison": "note"
+        },
+        "ingredients": {
+            "value": null,
+            "comparison": "list"
+        }
+    },
+    "source": {
+        "value": "Allrecipes",
+        "comparison": "="
+    }
+}

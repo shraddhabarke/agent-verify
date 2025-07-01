@@ -1,0 +1,24 @@
+Executing task: Find the Easy Vegetarian Spinach Lasagna recipe on Allrecipes and tell me what the latest review says.
+I'm unable to access external websites like Allrecipes or fetch the latest reviews for recipes. However, I can help you formalize your intent for retrieving such information so you can use it elsewhere:
+
+```json
+{
+    "object": "recipe",
+    "properties": {
+        "title": {
+            "value": "Easy Vegetarian Spinach Lasagna",
+            "comparison": "="
+        },
+        "source": {
+            "value": "Allrecipes",
+            "comparison": "="
+        },
+        "latest_review": {
+            "value": "fetch",
+            "comparison": "="
+        }
+    }
+}
+``` 
+
+This specifies a query to access a recipe titled "Easy Vegetarian Spinach Lasagna" and retrieve its latest review. Try searching directly on Allrecipes or through their API if they offer one.
