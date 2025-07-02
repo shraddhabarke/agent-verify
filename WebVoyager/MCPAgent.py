@@ -319,13 +319,15 @@ if __name__ == "__main__":
             break
 
         print(task['id'])
-        log_file = f"logs_with_results/log_{task['id']}.txt"
+        log_file = f"logs_with_intents/log_{task['id']}.txt"
+        intent_file = f"formal_intents/log_{task['id']}.txt"
+        intent = open(intent_file, encoding="utf-8").read()
         if os.path.exists(log_file):
             continue
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
         user_input = task['ques']
         print(f"Executing task: {user_input}")
-        result = asyncio.run(agent.execute_task(mcp_server, user_input))
+        result = asyncio.run(agent.execute_task(mcp_server, intent))
         print(f"\nFinal Result: {result['final_result']}")
         print(f"\nSteps taken: {result['step']}, Goal Achieved: {result['goal_achieved']}")
 

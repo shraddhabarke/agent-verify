@@ -183,7 +183,7 @@ def check_intent_alignment(logs, intents_folder):
 
 
 def main():
-    logs_path = 'logs/'
+    logs_path = 'logs_with_intents/'
     logs = get_logs(logs_path)
     # get_formal_intent(logs)
     check_intent_alignment(logs, 'formal_intents_trial_2/')
