@@ -1,34 +1,18 @@
 import json
 import os
-from openai import AzureOpenAI
 from fastmcp import Client, FastMCP
 import asyncio
-from dotenv import load_dotenv
-from azure.identity import get_bearer_token_provider, AzureCliCredential
 from mcp.types import TextContent, ImageContent
 import traceback
 import re
 import sys
 
-from azure.ai.inference import ChatCompletionsClient
-from azure.identity import DefaultAzureCredential, ChainedTokenCredential, AzureCliCredential
 import os
 
-from agent import Agent
+from agent_verify.agent import Agent
 
 # An AI agent that uses Azure OpenAI to call functions from a MCP server
 class WebVoyagerAgent(Agent):
-    # def __init__(self):
-    #     load_dotenv()
-    #     self.llm_client = AzureOpenAI(
-    #         api_version="2024-05-01-preview",
-    #         azure_endpoint=os.environ['OPENAI_ENDPOINT'],
-    #         azure_ad_token_provider=get_bearer_token_provider(
-    #             AzureCliCredential(),
-    #             "https://cognitiveservices.azure.com/.default"
-    #         )
-    #     )
-    
     def __init__(
             self,
             api_version = '2025-03-01-preview',  # Ensure this is a valid API version see: https://learn.microsoft.com/en-us/azure/ai-services/openai/api-version-deprecation#latest-ga-api-release
@@ -56,24 +40,6 @@ class WebVoyagerAgent(Agent):
             param_str += s
         desc = f"-{tool.name}({param_str}): {tool.description}"
         return desc
-    
-    # def call_llm(self, system_prompt, user_prompt, max_tokens=1000):
-    #     """
-    #     Send the prompt to Azure OpenAI (GPT-4o) and handle token counting.
-    #     Returns the text output from the model.
-    #     """
-    #     response = self.llm_client.chat.completions.create(
-    #         model=os.environ['OPENAI_TEXT_MODEL'],
-    #         messages=[
-    #             {"role": "system", "content": system_prompt},
-    #             {"role": "user", "content": user_prompt},
-    #         ],
-    #         max_tokens=max_tokens,
-    #     )
-
-    #     completion = response.choices[0].message.content.strip()
-
-    #     return completion
     
     def call_llm(self, system_prompt, user_prompt, max_tokens=1000):
         """
@@ -298,18 +264,16 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
     
 
 if __name__ == "__main__":
-    task_file = 'WebVoyager_data.jsonl'
-    task_filter = 'Allrecipes'
+    folder_path = "agent_verify/WebVoyager"
+    task_file = os.path.join(folder_path, 'WebVoyager_data.jsonl')
+    mcp_server = os.path.join(folder_path, 'AllRecipes.py')
     task_count = 100 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
-    mcp_server = 'AllRecipes.py'
+    task_filter = 'Allrecipes'
+    agent = WebVoyagerAgent()
 
 
     with open(task_file, 'r', encoding='utf-8') as f:
         task_data = [json.loads(line) for line in f if line.strip()]
-
-    agent = WebVoyagerAgent()
-    #user_input = 'Search for a popular Pasta Sauce with more than 1000 reviews and a rating above 4 stars. Create a shopping list of ingredients for this recipe.'
-    #result = asyncio.run(agent.execute_task(mcp_server, user_input))
     
     count = task_count
     for task in task_data:
@@ -319,8 +283,8 @@ if __name__ == "__main__":
             break
 
         print(task['id'])
-        log_file = f"logs_with_intents/log_{task['id']}.txt"
-        intent_file = f"formal_intents/log_{task['id']}.txt"
+        log_file = os.path.join(folder_path, f"logs_with_intents/log_{task['id']}.txt")
+        intent_file = os.path.join(folder_path, f"formal_intents/log_{task['id']}.txt")
         intent = open(intent_file, encoding="utf-8").read()
         if os.path.exists(log_file):
             continue
