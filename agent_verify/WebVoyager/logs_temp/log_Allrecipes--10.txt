@@ -1,0 +1,1 @@
+Executing task: Find The Most Popular Recipes of the 1960s, noting the recipe name, preparation time and total time of the second recipe in this collection.

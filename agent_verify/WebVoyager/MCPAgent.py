@@ -6,7 +6,7 @@ from mcp.types import TextContent, ImageContent
 import traceback
 import re
 import sys
-
+import argparse
 import os
 
 from agent_verify.agent import Agent
@@ -52,7 +52,7 @@ class WebVoyagerAgent(Agent):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=max_tokens,
+            # max_tokens=max_tokens,
         )
 
         completion = response.choices[0].message.content.strip()
@@ -65,6 +65,7 @@ class WebVoyagerAgent(Agent):
             resp_items = []
             print(f"Function Name: {function_name} Function Args: {function_args}")
             func_response = await mcp_client.call_tool(function_name, function_args)
+            func_response = func_response.content
             for item in func_response:
                 if isinstance(item, TextContent):
                     resp_items.append({"type": "text", "text": item.text})
@@ -218,7 +219,9 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
                 user_message = f"Goal: {goal}\nExecution History: {json.dumps(history, indent=2)}"                
                 response = self.call_llm(system_prompt, user_message)                
                 llm_response = self.fix_json_response(response)
-                    
+                
+                # print("Response:", response)
+                # print("LLM Response:", llm_response)
                 # Expected llm_response: {"function": "func_name", "args": {...}, "stop": bool, "explanation": str}
                 if not llm_response or llm_response.get("stop"):
                     print("\nTask complete or LLM indicated to stop.")
@@ -261,13 +264,12 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
             "goal_achieved": goal_achieved
             }
 
-    
-
-if __name__ == "__main__":
+def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
     folder_path = "agent_verify/WebVoyager"
     task_file = os.path.join(folder_path, 'WebVoyager_data.jsonl')
-    mcp_server = os.path.join(folder_path, 'AllRecipes.py')
-    task_count = 100 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
+    mcp_server = os.path.join(folder_path, mcp_server)
+    # mcp_server = "agent_verify/WebVoyager/mcp_server/server.py"
+    task_count = 1 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     task_filter = 'Allrecipes'
     agent = WebVoyagerAgent()
 
@@ -283,7 +285,7 @@ if __name__ == "__main__":
             break
 
         print(task['id'])
-        log_file = os.path.join(folder_path, f"logs_with_intents/log_{task['id']}.txt")
+        log_file = os.path.join(folder_path, f"{logs_folder}/log_{task['id']}.txt")
         intent_file = os.path.join(folder_path, f"formal_intents/log_{task['id']}.txt")
         intent = open(intent_file, encoding="utf-8").read()
         if os.path.exists(log_file):
@@ -300,3 +302,13 @@ if __name__ == "__main__":
         count -= 1
         sys.stdout.close()  # Close the suppressed stdout
         sys.stdout = sys.__stdout__  # Restore original stdout
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("mcp_server", nargs="?", default="AllRecipes.py", help="Optional script name")
+    parser.add_argument("logs_folder", nargs="?", default="logs_temp", help="Optional script name")
+    args = parser.parse_args()
+
+    assert(args.mcp_server in ["AllRecipes_test.py", "AllRecipes.py"])    
+
+    main(args.mcp_server, args.logs_folder)

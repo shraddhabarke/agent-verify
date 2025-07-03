@@ -1,0 +1,1 @@
+Executing task: Find a popular recipe for a chocolate chip cookie and list the ingredients and preparation steps.

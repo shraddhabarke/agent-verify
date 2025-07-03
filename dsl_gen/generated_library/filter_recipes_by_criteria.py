@@ -1,13 +1,10 @@
-from bs4 import BeautifulSoup
 import requests
 import urllib.parse
-from mcp.server.fastmcp import FastMCP
+from bs4 import BeautifulSoup
 from typing import Any
+# Current available functions
+# Function search and get_recipe_details are defined as given
 
-# MCP server for AllRecipes.com
-mcp = FastMCP('Recipe MCP server')
-
-@mcp.tool()
 def search(query: str) -> Any:
     """Search for recipes by query string. Returns a list of recipes with title, URL, rating count, and rating value."""
     search_url = f'https://www.allrecipes.com/search?q={urllib.parse.quote_plus(query, safe="")}'
@@ -17,7 +14,6 @@ def search(query: str) -> Any:
     result = _parse_search_result(html_content)
     return result
 
-@mcp.tool()
 def get_recipe_details(recipe_url: str) -> Any:
     """Get detailed information for a recipe by URL. Returns a dictionary with title, rating, rating count, review count, description, prep time, cook time, total time, servings, yield, ingredients, nutrition facts, and directions."""
     response = requests.get(recipe_url)
@@ -138,7 +134,6 @@ def _parse_recipe_details(html_content) -> Any:
 
     return recipe
 
-@mcp.tool()
 def filter_recipes_by_criteria(recipes, min_rating=None, min_reviews=None, max_calories=None, max_prep_time=None):
     """
     Filters a list of recipes based on provided criteria.
@@ -173,6 +168,67 @@ def filter_recipes_by_criteria(recipes, min_rating=None, min_reviews=None, max_c
     
     return filtered_recipes
 
+# Unit tests
+def test_filter_recipes_by_criteria():
+    # Mocking the `search` results
+    recipes = [
+        {'url': 'https://www.allrecipes.com/recipe/21090/vegetarian-four-cheese-lasagna/'},
+        {'url': 'https://www.allrecipes.com/recipe/229764/easy-vegetarian-spinach-lasagna/'},
+        {'url': 'https://www.allrecipes.com/recipe/236878/debbies-vegetable-lasagna/'}
+    ]
+    
+    # Mocking `get_recipe_details` for each recipe
+    def mock_get_recipe_details(recipe_url):
+        # Hardcoding mock details for these URLs
+        mock_data = {
+            'https://www.allrecipes.com/recipe/21090/vegetarian-four-cheese-lasagna/': {
+                'rating': 4.5,
+                'rating_count': 200,
+                'prep_time': 20,
+                'nutrition_facts': {'calories': 500},
+            },
+            'https://www.allrecipes.com/recipe/229764/easy-vegetarian-spinach-lasagna/': {
+                'rating': 4.6,
+                'rating_count': 150,
+                'prep_time': 15,
+                'nutrition_facts': {'calories': 400},
+            },
+            'https://www.allrecipes.com/recipe/236878/debbies-vegetable-lasagna/': {
+                'rating': 4.2,
+                'rating_count': 60,
+                'prep_time': 45,
+                'nutrition_facts': {'calories': 700},
+            }
+        }
+        return mock_data.get(recipe_url, {})
+    
+    # Patch the `get_recipe_details` function
+    global get_recipe_details
+    original_get_recipe_details = get_recipe_details
+    get_recipe_details = mock_get_recipe_details
+    
+    try:
+        # Test 1: Filter by minimum rating only
+        result = filter_recipes_by_criteria(recipes, min_rating=4.5)
+        assert len(result) == 2  # Two recipes meet the rating criteria
 
+        # Test 2: Filter by minimum reviews and maximum calories
+        result = filter_recipes_by_criteria(recipes, min_reviews=100, max_calories=450)
+        assert len(result) == 1  # Only one recipe meets the criteria
+        
+        # Test 3: Filter by maximum prep time
+        result = filter_recipes_by_criteria(recipes, max_prep_time=30)
+        assert len(result) == 2  # Two recipes meet the prep time criteria
+
+        # Test 4: No recipe matches criteria
+        result = filter_recipes_by_criteria(recipes, max_prep_time=10)
+        assert len(result) == 0  # No recipe meets the criteria
+        
+        print("All tests passed!")
+    finally:
+        # Restore the original function
+        get_recipe_details = original_get_recipe_details
+
+# Run the tests
 if __name__ == "__main__":
-    mcp.run(transport='stdio')
+    test_filter_recipes_by_criteria()

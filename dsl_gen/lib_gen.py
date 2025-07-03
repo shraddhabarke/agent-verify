@@ -50,7 +50,7 @@ You are an expert at generating functions from tasks.
 You will be given a list of queries and the steps taken to solve them.
 Your task is to propose high-level functions that are commonly used in solving these queries.
 You are also given the current library of already defined functions.
-You need to suggest more functions that can be added to this library.
+You need to suggest one function that can be added to this library and can be used in most of the observed tasks.
 Output only the name of the function, its arguments and the description in the following format:
 
 Function Name: <name of the function>
@@ -67,9 +67,7 @@ Function Description: <description of the function>
             ],
         )
         completion = response.choices[0].message.content.strip()
-        print(completion)
         res = self.parse_result(completion)
-        print(res)
         return res
     
     def parse_result(self, result):
@@ -156,6 +154,7 @@ Your task is to define the new function.
 You can use the functions in the current set.
 You can use the queries and the steps taken to solve them to understand what the function does.    
 Do not use any function that is not in the current set.
+Output only a python code implementation of the function. Do not give any examples or explanations.
 '''
         user_message = f'Current available functions: {library}\nNew function: {new_func}\nSolved Tasks: {tasks}'
         response = self.llm_client.complete(
@@ -165,10 +164,60 @@ Do not use any function that is not in the current set.
                 {"role": "user", "content": user_message},
             ],
         )
-        # print(system_prompt)
-        # print(user_message)
         completion = response.choices[0].message.content.strip()
-        return completion
+        return self.parse_output(completion)
+    
+    def parse_output(self, res):
+        lines = res.splitlines()
+        start = False 
+        new_lines = []
+        for i in range(len(lines)):
+            if start and "```" in lines[i]:
+                break
+            if start:
+                new_lines.append(lines[i])
+            if "```python" in lines[i]:
+                start = True 
+        code = "\n".join(new_lines)
+        return code
+    
+class FuncCorrector(Agent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def correct_function(self, func):
+        system_prompt = f'''
+You are an expert at prediucting problems with functions.
+The user generated a function to be used by an LLM agent.
+Although the function is conceptually fine, since it is called by an LLM agent, it may be incorrect.
+The LLM may not call the function with the correct arguments or expected types.
+Your task is to predict such problems and correct the function.
+Output only a python code implementation of the function. Do not give any examples or explanations.
+'''
+        response = self.llm_client.complete(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": func},
+            ],
+        )
+        completion = response.choices[0].message.content.strip()
+        return self.parse_output(completion)
+    
+    def parse_output(self, res):
+        lines = res.splitlines()
+        start = False 
+        new_lines = []
+        for i in range(len(lines)):
+            if start and "```" in lines[i]:
+                break
+            if start:
+                new_lines.append(lines[i])
+            if "```python" in lines[i]:
+                start = True 
+        code = "\n".join(new_lines)
+        return code
+
 
 
 def get_tasks(logs_folder, task_file, task_filter='Allrecipes'):
@@ -214,38 +263,56 @@ async def get_tools(mcp_server):
 
 
 def main():
+    ########## CONFIG ##########
     mcp_client = 'agent_verify/WebVoyager/AllRecipes.py'
     logs_folder = "agent_verify/WebVoyager/logs"
     task_file = "agent_verify/WebVoyager/WebVoyager_data.jsonl"
     task_filter = "Allrecipes"
     
+    ########## TOOLS ##########
     tools = asyncio.run(get_tools(mcp_client))
     library = Library(tools).get_funcs()
     tasks = get_tasks(logs_folder, task_file, task_filter)
+    tasks = tasks[:5]
 
+    ########## AGENTS ##########
     lib_gen_agent = FunctionSuggestionAgent()
     lib_ranker_agent = LibRankerAgent()
     func_def_agent = FuncDefinitionAgent()
+    func_corrector_agent = FuncCorrector()
 
     suggested_funcs = lib_gen_agent.suggest_funcs(tasks, library)
-    print(colored(suggested_funcs, 'green'))
+    print(colored('Suggested funcs:', 'green'))
+    for f in suggested_funcs:
+        print(colored(f, 'green'))
 
-    rank = lib_ranker_agent.rank_funcs(suggested_funcs)
-    func_name = rank.splitlines()[0].strip()
-    print(colored(func_name, 'blue'))
-    suggested_func = None
-    for func in suggested_funcs:
-        if func['name'] == func_name:
-            suggested_func = func
-            break
-
-    if suggested_func is None:
-        print("Function not found")
+    if len(suggested_funcs) > 1:
+        rank = lib_ranker_agent.rank_funcs(suggested_funcs)
+        func_name = rank.splitlines()[0].strip()
+        print(colored(func_name, 'blue'))
+        suggested_func = None
         for func in suggested_funcs:
-            print(func['name'])
-        return
+            if func['name'] == func_name:
+                suggested_func = func
+                break
+        if suggested_func is None:
+            print(colored("Function not found", 'red'))
+            for func in suggested_funcs:
+                print(colored(func['name'], 'red'))
+            return
+    else:
+        suggested_func = suggested_funcs[0]
+
+    
     new_func = func_def_agent.define_func(library, suggested_func, tasks)
     print(colored(new_func, 'yellow'))
+
+    new_func = func_corrector_agent.correct_function(new_func)
+    print(colored(new_func, 'blue'))
+    # with open(f"dsl_gen/generated_library/{suggested_func['name']}.py", "w", encoding="utf-8") as f:
+    #     f.write(new_func)
+
+    return new_func, suggested_func['name']
 
 
 
