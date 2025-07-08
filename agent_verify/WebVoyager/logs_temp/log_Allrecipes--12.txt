@@ -1,0 +1,1 @@
+Executing task: Search for a popular cookie recipe on Allrecipes with more than 1000 reviews and a rating of 4.5 stars or better. Provide the list of ingredients needed.

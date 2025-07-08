@@ -29,9 +29,9 @@ def create_file(mcp_server_old, mcp_server_new, func_def):
         lines = src.readlines()
 
     top_lines, last_lines = lines[:-2], lines[-2:]
-    func_lines = func_def.splitlines()
+    func_lines = [f'{line}\n' for line in func_def.splitlines()]
     new_lines = top_lines + ['@mcp.tool()\n'] + func_lines + last_lines
-    new_code = '\n'.join(new_lines)
+    new_code = ''.join(new_lines)
     print(colored(new_code, 'red'))
     with open(mcp_server_new, "w") as dst:
         dst.writelines(new_code)
@@ -49,7 +49,7 @@ def main():
     print(colored(new_func_def, 'blue'))
     create_file(mcp_server_old, mcp_server_new, new_func_def)
 
-    mcp_agent.main(mcp_server_new)
+    # mcp_agent.main(mcp_server_new)
 
 
 if __name__ == '__main__':

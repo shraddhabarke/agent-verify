@@ -4,6 +4,7 @@ import asyncio
 from fastmcp import Client
 from termcolor import colored
 from agent_verify.agent import Agent
+from dsl_gen.utils import *
 
 class Func():
     def __init__(self, name, args, description):
@@ -192,6 +193,8 @@ The user generated a function to be used by an LLM agent.
 Although the function is conceptually fine, since it is called by an LLM agent, it may be incorrect.
 The LLM may not call the function with the correct arguments or expected types.
 Your task is to predict such problems and correct the function.
+When you check the argument types, do not just add a try catch. But try to convert the argument into the required format first.
+Make sure top return a proper error message in case of an error or an empty output.
 Output only a python code implementation of the function. Do not give any examples or explanations.
 '''
         response = self.llm_client.complete(
@@ -220,22 +223,7 @@ Output only a python code implementation of the function. Do not give any exampl
 
 
 
-def get_tasks(logs_folder, task_file, task_filter='Allrecipes'):
-    tasks = []
-    traj_files = os.listdir(logs_folder)
-    with open(task_file, 'r', encoding='utf-8') as f:
-        task_data = [json.loads(line) for line in f if line.strip()]
-    for task in task_data:
-        if task['web_name'] != task_filter:
-            continue 
-        task_id = task['id']
-        intent = task['ques']
-        traj_file = f"log_{task_id}.txt"
-        if traj_file in traj_files:
-            with open(os.path.join(logs_folder, traj_file), "r") as f:
-                traj = '\n'.join(f.read().splitlines()[2:])
-            tasks.append({"id": task_id, "query": intent, "traj": traj})
-    return tasks
+
 
 
 def get_tool_description(tool):
@@ -253,24 +241,17 @@ def get_tool_description(tool):
         description=tool.description
     )
 
-async def get_tools(mcp_server):
-    async with Client(mcp_server) as mcp_client:
-        tools = await mcp_client.list_tools()
-        tool_descriptions = ([
-            get_tool_description(tool) for tool in tools
-        ])
-        return tool_descriptions
 
 
 def main():
     ########## CONFIG ##########
     mcp_client = 'agent_verify/WebVoyager/AllRecipes.py'
-    logs_folder = "agent_verify/WebVoyager/logs"
+    logs_folder = "agent_verify/WebVoyager/logs_with_results"
     task_file = "agent_verify/WebVoyager/WebVoyager_data.jsonl"
     task_filter = "Allrecipes"
     
-    ########## TOOLS ##########
-    tools = asyncio.run(get_tools(mcp_client))
+    ########## TOOLS AND TASKS##########
+    tools = get_tools(mcp_client)
     library = Library(tools).get_funcs()
     tasks = get_tasks(logs_folder, task_file, task_filter)
     tasks = tasks[:5]

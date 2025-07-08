@@ -138,41 +138,6 @@ def _parse_recipe_details(html_content) -> Any:
 
     return recipe
 
-@mcp.tool()
-def filter_recipes_by_criteria(recipes, min_rating=None, min_reviews=None, max_calories=None, max_prep_time=None):
-    """
-    Filters a list of recipes based on provided criteria.
-    
-    :param recipes: List of dictionaries with recipe information.
-    :param min_rating: (float, optional) Minimum rating a recipe must have. Default is None.
-    :param min_reviews: (int, optional) Minimum number of reviews a recipe must have. Default is None.
-    :param max_calories: (int, optional) Maximum calories per serving a recipe can have. Default is None.
-    :param max_prep_time: (int, optional) Maximum preparation time (in minutes) a recipe can have. Default is None.
-    :return: List of recipes that match all given criteria.
-    """
-    filtered_recipes = []
-    
-    for recipe in recipes:
-        # Extract detailed information for the given recipe URL
-        details = get_recipe_details(recipe['url'])
-        
-        # Apply filters one by one
-        if min_rating is not None and details['rating'] < min_rating:
-            continue
-        if min_reviews is not None and details['rating_count'] < min_reviews:
-            continue
-        if max_calories is not None and 'calories' in details['nutrition_facts']:
-            calories = details['nutrition_facts']['calories']
-            if calories > max_calories:
-                continue
-        if max_prep_time is not None and details['prep_time'] > max_prep_time:
-            continue
-        
-        # If the recipe passes all filters, include it in the results
-        filtered_recipes.append(details)
-    
-    return filtered_recipes
-
 
 if __name__ == "__main__":
     mcp.run(transport='stdio')

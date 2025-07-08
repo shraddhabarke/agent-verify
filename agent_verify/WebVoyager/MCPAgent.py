@@ -267,7 +267,11 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
 def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
     folder_path = "agent_verify/WebVoyager"
     task_file = os.path.join(folder_path, 'WebVoyager_data.jsonl')
-    mcp_server = os.path.join(folder_path, mcp_server)
+    # mcp_server = os.path.join(folder_path, mcp_server)
+    mcp_server = os.path.normpath(mcp_server)
+    if not os.path.isfile(mcp_server):  # assume it's relative only if it’s not a file already
+        mcp_server = os.path.join(folder_path, mcp_server)
+
     # mcp_server = "agent_verify/WebVoyager/mcp_server/server.py"
     task_count = 1 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     task_filter = 'Allrecipes'
@@ -305,7 +309,7 @@ def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mcp_server", nargs="?", default="AllRecipes.py", help="Optional script name")
+    parser.add_argument("mcp_server", nargs="?", default="AllRecipes_test.py", help="Optional script name")
     parser.add_argument("logs_folder", nargs="?", default="logs_temp", help="Optional script name")
     args = parser.parse_args()
 
