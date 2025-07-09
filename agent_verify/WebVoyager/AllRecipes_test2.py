@@ -1051,5 +1051,6 @@ def filter_recipes_by_criteria(recipes, min_review_count, min_rating_value):
         except (ValueError, TypeError, AttributeError):
             continue  # Skip this recipe if there is an issue with parsing values
     return filtered_recipes
+@mcp.tool()
 if __name__ == "__main__":
     mcp.run(transport='stdio')

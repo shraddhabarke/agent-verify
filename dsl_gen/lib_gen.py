@@ -6,40 +6,7 @@ from termcolor import colored
 from agent_verify.agent import Agent
 from dsl_gen.utils import *
 
-class Func():
-    def __init__(self, name, args, description):
-        self.name = name
-        self.args = args
-        self.description = description
 
-    def __str__(self):
-        arg_lines = []
-        for name, typ, default in self.args:
-            if default is not None:
-                arg_lines.append(f"  - {name}: {typ} (default={default})")
-            else:
-                arg_lines.append(f"  - {name}: {typ}")
-        args_formatted = "\n".join(arg_lines) if arg_lines else "  (no arguments)"
-        
-        return (
-            f"Function Name: {self.name}\n"
-            f"Function Arguments:\n{args_formatted}\n"
-            f"Function Description: {self.description}\n"
-        )
-    
-    def __repr__(self):
-        return self.__str__()
-    
-class Library():
-    def __init__(self, funcs):
-        self.funcs = [func for func in funcs if isinstance(func, Func)]
-
-    def add_func(self, func):
-        if isinstance(func, Func):
-            self.funcs.append(func)
-
-    def get_funcs(self):
-        return self.funcs
 
 class FunctionSuggestionAgent(Agent):
     def __init__(self, *args, **kwargs):
@@ -156,6 +123,9 @@ You can use the functions in the current set.
 You can use the queries and the steps taken to solve them to understand what the function does.    
 Do not use any function that is not in the current set.
 Output only a python code implementation of the function. Do not give any examples or explanations.
+Remember the all the inputs to the function must be string. You can typcast them internally if you want. 
+For example, if you want an input parameter x to be a string, you should expect that the user will provide it as a string.
+You can internally say x = str(x).
 '''
         user_message = f'Current available functions: {library}\nNew function: {new_func}\nSolved Tasks: {tasks}'
         response = self.llm_client.complete(
@@ -166,6 +136,7 @@ Output only a python code implementation of the function. Do not give any exampl
             ],
         )
         completion = response.choices[0].message.content.strip()
+        # print(completion)
         return self.parse_output(completion)
     
     def parse_output(self, res):
@@ -179,6 +150,8 @@ Output only a python code implementation of the function. Do not give any exampl
                 new_lines.append(lines[i])
             if "```python" in lines[i]:
                 start = True 
+        if new_lines == []:
+            return res
         code = "\n".join(new_lines)
         return code
     
@@ -188,7 +161,7 @@ class FuncCorrector(Agent):
 
     def correct_function(self, func):
         system_prompt = f'''
-You are an expert at prediucting problems with functions.
+You are an expert at predicting problems with functions.
 The user generated a function to be used by an LLM agent.
 Although the function is conceptually fine, since it is called by an LLM agent, it may be incorrect.
 The LLM may not call the function with the correct arguments or expected types.
@@ -205,6 +178,7 @@ Output only a python code implementation of the function. Do not give any exampl
             ],
         )
         completion = response.choices[0].message.content.strip()
+        # print(completion)
         return self.parse_output(completion)
     
     def parse_output(self, res):
@@ -222,8 +196,44 @@ Output only a python code implementation of the function. Do not give any exampl
         return code
 
 
+class FuncCorrectorFromTrajectories(Agent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-
+    def correct_function(self, old_library, new_func, task, old_trajectory, new_trajectory):
+        system_prompt = f'''
+You are an expert at debugging and improving functions.
+The user had to solve a task and they had access to a list of tools they could use.
+Later, there was an addition to the set of functions, and the user solved the task again.
+However, it did not improve the results because the function was not defined properly.
+Your job is to look at the trajectories and improve the newly added function.
+Output only a python code implementation of the function followed an explanation of what the mistake was.
+Only change the things that caused the mistake. Do not predict any new changes.
+'''
+        response = self.llm_client.complete(
+            model=self.model_name,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f'Old Library: {old_library}\nNew Function: {new_func}\nTask: {task}\nOld Trajectory: {old_trajectory}\nNew Trajectory: {new_trajectory}'},
+            ],
+        )
+        completion = response.choices[0].message.content.strip()
+        # print(completion)
+        return self.parse_output(completion)
+    
+    def parse_output(self, res):
+        lines = res.splitlines()
+        start = False 
+        new_lines = []
+        for i in range(len(lines)):
+            if start and "```" in lines[i]:
+                break
+            if start:
+                new_lines.append(lines[i])
+            if "```python" in lines[i]:
+                start = True 
+        code = "\n".join(new_lines)
+        return code
 
 
 def get_tool_description(tool):
@@ -241,7 +251,49 @@ def get_tool_description(tool):
         description=tool.description
     )
 
+def correct_func_from_traj(old_library, new_func, task, old_trajectory, new_trajectory):
+    agent = FuncCorrectorFromTrajectories()
+    return agent.correct_function(old_library, new_func, task, old_trajectory, new_trajectory)
 
+
+def get_new_func(tasks, old_library, verbose=False):
+    ####### AGENTS #######
+    lib_gen_agent = FunctionSuggestionAgent()
+    lib_ranker_agent = LibRankerAgent()
+    func_def_agent = FuncDefinitionAgent()
+    func_corrector_agent = FuncCorrector()
+    
+    suggested_funcs = lib_gen_agent.suggest_funcs(tasks, old_library)
+
+    if len(suggested_funcs) > 1:
+        rank = lib_ranker_agent.rank_funcs(suggested_funcs)
+        func_name = rank.splitlines()[0].strip()
+        suggested_func = None
+        for func in suggested_funcs:
+            if func['name'] == func_name:
+                suggested_func = func
+                break
+        if suggested_func is None:
+            print(colored("Function not found", 'red'))
+            for func in suggested_funcs:
+                print(colored(func['name'], 'red'))
+            return
+    else:
+        suggested_func = suggested_funcs[0]
+    
+    if verbose:
+        print(colored(f'Suggested function name: {suggested_func['name']}', 'blue'))
+        
+
+    new_func = func_def_agent.define_func(old_library, suggested_func, tasks)
+    if verbose:
+        print(colored(f'Proposed function definition:\n{new_func}', 'yellow'))
+
+    new_func = func_corrector_agent.correct_function(new_func)
+    if verbose:
+        print(colored(f'Corrected function definition:\n{new_func}', 'green'))
+
+    return suggested_func['name'], new_func
 
 def main():
     ########## CONFIG ##########
@@ -261,6 +313,7 @@ def main():
     lib_ranker_agent = LibRankerAgent()
     func_def_agent = FuncDefinitionAgent()
     func_corrector_agent = FuncCorrector()
+    func_corrector_agent_from_traj = FuncCorrectorFromTrajectories()
 
     suggested_funcs = lib_gen_agent.suggest_funcs(tasks, library)
     print(colored('Suggested funcs:', 'green'))
@@ -294,6 +347,7 @@ def main():
     #     f.write(new_func)
 
     return new_func, suggested_func['name']
+
 
 
 

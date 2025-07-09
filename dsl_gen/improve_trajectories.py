@@ -4,18 +4,54 @@ import re
 import sys
 import traceback
 
-from termcolor import colored
+
 from fastmcp import Client
 from mcp.types import TextContent, ImageContent
 
 from agent_verify.agent import Agent
 from dsl_gen.utils import *
+from dsl_gen.lib_gen import *
 
-class ImproveTrajectory(Agent):
+from termcolor import colored as _colored
+
+def colored(text, color=None, on_color=None, attrs=None):
+    return text
+    # If printing to terminal (stdout or stderr) → enable colors
+    if sys.stdout.isatty() or sys.stderr.isatty():
+        return _colored(text, color=color, on_color=on_color, attrs=attrs)
+    else:
+        # If output is redirected (e.g. to a file), disable colors
+        return text
+
+class JsonCorrector(Agent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def fix_json_response(self, response: str) -> dict:
+    def ask_llm(self, input_str, error_message=None) -> str:
+        system_prompt = '''
+You are an expert at fixing json format.
+The user will provide you with a string. But they are not able to parse it into a json format.
+They may provide you with an error message. 
+Your task is to fix the string and return a valid json format.
+Only output the string in the correct JSON format. Do not output anything else.
+I will pass your output to the function json.loads directly.
+'''     
+        messages=[
+            {"role": "system", "content": system_prompt},
+        ]
+
+        if error_message:
+            messages.append({"role": "user", "content": f'Input string: {input_str}\nError message: {error_message}'})
+        else:
+            messages.append({"role": "user", "content": f'Input string: {input_str}'})
+        response = self.llm_client.complete(
+            model=self.model_name,
+            messages=messages,
+        )
+        completion = response.choices[0].message.content.strip()
+        return completion
+
+    def fix_json_response(self, response: str, level=0) -> dict:
         """
         Fixes common JSON formatting issues in a string response.
         
@@ -83,13 +119,27 @@ class ImproveTrajectory(Agent):
 
             try:
                 return json.loads(cleaned_string)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 try:
                     wrapped_string = f"[{cleaned_string}]"
                     return json.loads(wrapped_string)
                 except json.JSONDecodeError:
+                    if level < 1:
+                        improved_string = self.ask_llm(cleaned_string, str(e))
+                        return self.fix_json_response(improved_string, level+1)
                     #raise ValueError("Unable to fix JSON response")
+                    print(colored(response, 'red'))
                     return cleaned_string
+
+    
+
+class ImproveTrajectory(Agent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.json_fixer = JsonCorrector()
+
+    
                 
     def improve_trajectory(self, goal, trajectory, new_history, old_funcs, new_funcs):
         system_prompt = '''
@@ -160,9 +210,9 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
     
 async def call_mcp_tool(mcp_client:Client, function_name, function_args):
     """ Calls a function on the MCP server and returns the result."""
+    resp_items = []
     try:
         async with mcp_client:
-            resp_items = []
             print(f"Function Name: {function_name} Function Args: {function_args}")
             func_response = await mcp_client.call_tool(function_name, function_args)
             func_response = func_response.content
@@ -196,7 +246,7 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
 
     while True:
         response = agent.improve_trajectory(goal, trajectory, history, old_funcs, new_funcs)
-        llm_response = agent.fix_json_response(response)
+        llm_response = agent.json_fixer.fix_json_response(response)
         if isinstance(llm_response, str):
             print(llm_response)
             return None
@@ -204,7 +254,7 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
             print("\nTask complete or LLM indicated to stop.")
             user_message = f"Goal: {goal}\nFinal tool response to extract from:\n {json.dumps(final_result, indent=2)}"     
             response = agent.get_final_answer(user_message)           
-            llm_response = agent.fix_json_response(response)
+            llm_response = agent.json_fixer.fix_json_response(response)
             final_result = llm_response.get("answer", None)
             goal_achieved = llm_response.get("goal_achieved", False)
             explanation = llm_response.get("explanation", "")
@@ -244,32 +294,80 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
         }
 
 
-def improve_trajectories(tasks, mcp_client, old_funcs, new_funcs, improved_logs_folder):
-    task_count = 100 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
+def improve_trajectories(tasks, mcp_client, old_funcs, new_funcs, improved_logs_folder, chunk_size=5):
+    # mcp_client = Client(mcp_server)
+    task_count = chunk_size # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     count = task_count
     for task in tasks:
         if count <= 0:
             break
+        count -= 1
 
         print(task['id'])
         log_file = os.path.normpath(f"{improved_logs_folder}/log_{task['id']}.txt")
 
 
-        if os.path.exists(log_file):
-            continue
+        # if os.path.exists(log_file):
+        #     continue
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
         user_input = task['query']
         print(f"Executing task: {user_input}")
-        result = asyncio.run(improve_trajectory(task, mcp_client, old_funcs, new_funcs))
+        try:
+            result = asyncio.run(improve_trajectory(task, mcp_client, old_funcs, new_funcs))
+        except Exception as e:
+            traceback.print_exc()
+            result = None
+            continue
+        if result is None or isinstance(result, str) or 'final_result' not in result.keys():
+            print(result, type(result))
         print(f"\nFinal Result: {result['final_result']}")
         print(f"\nSteps taken: {result['step']}, Goal Achieved: {result['goal_achieved']}")
 
         print("\n" + "="*50 + "\n")
  
-        count -= 1
+        
         sys.stdout.close()  # Close the suppressed stdout
         sys.stdout = sys.__stdout__  # Restore original stdout
 
+
+def correct_function(task_id):
+    old_logs_folder = "agent_verify/WebVoyager/logs"
+    improved_logs_folder = "agent_verify/WebVoyager/improved_logs"
+    
+    old_logs_file = os.path.normpath(f"{old_logs_folder}/log_{task_id}.txt")
+    improved_logs_file = os.path.normpath(f"{improved_logs_folder}/log_{task_id}.txt")
+
+    with open(old_logs_file, 'r', encoding='utf-8') as f:
+        old_logs = f.read()
+    with open(improved_logs_file, 'r', encoding='utf-8') as f:
+        improved_logs = f.read()
+    
+    correct_func_from_traj(old_logs, improved_logs, task_id)
+
+
+
+def check_trajectory(trajectory, new_func_name):
+    error_in_traj = 1
+    error_in_func = 2 
+    no_error = 3
+    lines = trajectory.splitlines()
+    func_called = False
+    stop_called = False 
+    final_answer_present = False
+    for line in lines:
+        if 'Final Result' in line:
+            final_answer_present = True
+            return no_error
+        if 'Task complete or LLM indicated to stop.' in line:
+            stop_called = True
+        if new_func_name in line:
+            func_called = True
+        if func_called and "Result" in line:
+            if 'Result: []' in line or 'error' in line or 'Error' in line:
+                return error_in_func
+            else:
+                func_called = False
+    return no_error
 
 
 def main():

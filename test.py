@@ -1,6 +1,7 @@
 import dsl_gen.lib_gen as lib_gen
 import agent_verify.WebVoyager.MCPAgent as mcp_agent
 from termcolor import colored
+from dsl_gen.utils import *
 
 def get_func(func_name, func_def):
     lines = func_def.splitlines()
@@ -24,17 +25,6 @@ def get_func(func_name, func_def):
 
 
 
-def create_file(mcp_server_old, mcp_server_new, func_def):
-    with open(mcp_server_old, "r") as src:
-        lines = src.readlines()
-
-    top_lines, last_lines = lines[:-2], lines[-2:]
-    func_lines = [f'{line}\n' for line in func_def.splitlines()]
-    new_lines = top_lines + ['@mcp.tool()\n'] + func_lines + last_lines
-    new_code = ''.join(new_lines)
-    print(colored(new_code, 'red'))
-    with open(mcp_server_new, "w") as dst:
-        dst.writelines(new_code)
 
 
 def main():
