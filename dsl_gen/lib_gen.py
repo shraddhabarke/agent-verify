@@ -122,10 +122,16 @@ Your task is to define the new function.
 You can use the functions in the current set.
 You can use the queries and the steps taken to solve them to understand what the function does.    
 Do not use any function that is not in the current set.
-Output only a python code implementation of the function. Do not give any examples or explanations.
 Remember the all the inputs to the function must be string. You can typcast them internally if you want. 
 For example, if you want an input parameter x to be a string, you should expect that the user will provide it as a string.
 You can internally say x = str(x).
+Regardless of the types, in the function definition, do not give any type hints.
+Also, make sure that your function has a doc string.
+Output a JSON object in the following fomat:
+{{
+    "new_function": <new_function>,
+    "explanation": <explanation>
+}}
 '''
         user_message = f'Current available functions: {library}\nNew function: {new_func}\nSolved Tasks: {tasks}'
         response = self.llm_client.complete(
@@ -134,12 +140,15 @@ You can internally say x = str(x).
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_message},
             ],
+            response_format="json_object"
         )
         completion = response.choices[0].message.content.strip()
+        completion = json.loads(completion)
         # print(completion)
-        return self.parse_output(completion)
+        return self.parse_output(completion['new_function'])
     
     def parse_output(self, res):
+        return res
         lines = res.splitlines()
         start = False 
         new_lines = []
@@ -165,10 +174,13 @@ You are an expert at predicting problems with functions.
 The user generated a function to be used by an LLM agent.
 Although the function is conceptually fine, since it is called by an LLM agent, it may be incorrect.
 The LLM may not call the function with the correct arguments or expected types.
-Your task is to predict such problems and correct the function.
-When you check the argument types, do not just add a try catch. But try to convert the argument into the required format first.
-Make sure top return a proper error message in case of an error or an empty output.
-Output only a python code implementation of the function. Do not give any examples or explanations.
+Your task is to predict such problems and correct the function by trying to convert the argument into the required format first.
+In case you cannot handle things, make sure top return a proper error message so that someone can look at the logs and interpret the error.
+Output a JSON object in the following fomat:
+{{
+    "new_function": <new_function>,
+    "explanation": <explanation>
+}}
 '''
         response = self.llm_client.complete(
             model=self.model_name,
@@ -176,12 +188,17 @@ Output only a python code implementation of the function. Do not give any exampl
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": func},
             ],
+            response_format="json_object"
         )
         completion = response.choices[0].message.content.strip()
-        # print(completion)
-        return self.parse_output(completion)
+        completion = json.loads(completion)
+        # print(completion['new_function'])
+        # print(completion, type(completion), res, type(res))
+        # kjdf
+        return self.parse_output(completion["new_function"])
     
     def parse_output(self, res):
+        return res
         lines = res.splitlines()
         start = False 
         new_lines = []
@@ -200,28 +217,36 @@ class FuncCorrectorFromTrajectories(Agent):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def correct_function(self, old_library, new_func, task, old_trajectory, new_trajectory):
+    def correct_function(self, old_library, new_func, task, old_trajectory, new_trajectory, new_func_def_history):
         system_prompt = f'''
 You are an expert at debugging and improving functions.
 The user had to solve a task and they had access to a list of tools they could use.
 Later, there was an addition to the set of functions, and the user solved the task again.
 However, it did not improve the results because the function was not defined properly.
+Most errors correcspond to the argument parsing. The input was expected to be of a format but it was not.
+You can correct these things by adding some additional code that converts the arguments into the required type.
 Your job is to look at the trajectories and improve the newly added function.
-Output only a python code implementation of the function followed an explanation of what the mistake was.
+Output a JSON object in the following fomat:
+{{
+    "new_function": <new_function>,
+    "explanation": <explanation>
+}}
 Only change the things that caused the mistake. Do not predict any new changes.
 '''
+        messages = [{"role": "system", "content": system_prompt}] + new_func_def_history + [{"role": "user", "content": f'Old Library: {old_library}\nNew Function: {new_func}\nTask: {task}\nOld Trajectory: {old_trajectory}\nNew Trajectory: {new_trajectory}'}]
         response = self.llm_client.complete(
             model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f'Old Library: {old_library}\nNew Function: {new_func}\nTask: {task}\nOld Trajectory: {old_trajectory}\nNew Trajectory: {new_trajectory}'},
-            ],
+            messages=messages,
+            response_format="json_object"
         )
         completion = response.choices[0].message.content.strip()
+        completion = json.loads(completion)
         # print(completion)
-        return self.parse_output(completion)
+        # ljkdf
+        return self.parse_output(completion["new_function"]), completion["explanation"]
     
     def parse_output(self, res):
+        return res
         lines = res.splitlines()
         start = False 
         new_lines = []
@@ -251,9 +276,9 @@ def get_tool_description(tool):
         description=tool.description
     )
 
-def correct_func_from_traj(old_library, new_func, task, old_trajectory, new_trajectory):
+def correct_func_from_traj(old_library, new_func, task, old_trajectory, new_trajectory, new_func_def_history):
     agent = FuncCorrectorFromTrajectories()
-    return agent.correct_function(old_library, new_func, task, old_trajectory, new_trajectory)
+    return agent.correct_function(old_library, new_func, task, old_trajectory, new_trajectory, new_func_def_history)
 
 
 def get_new_func(tasks, old_library, verbose=False):

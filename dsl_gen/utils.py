@@ -48,7 +48,15 @@ def get_tool_description(tool):
     param_str = ''
     i = 0
     for p in tool.inputSchema['properties'].keys():
-        type = tool.inputSchema['properties'][p]['type']
+        # print(tool.inputSchema['properties'][p])
+        # dlfjk
+        if 'type' not in tool.inputSchema['properties'][p].keys():
+            if 'anyOf' not in tool.inputSchema['properties'][p].keys():
+                type = "Any"
+            else:   
+                type = [tool.inputSchema['properties'][p]['anyOf'][i]['type'] for i in range(len(tool.inputSchema['properties'][p]['anyOf']))]
+        else:
+            type = tool.inputSchema['properties'][p]['type']
         s = f'{p}:{type}'
 
         if 'default' in tool.inputSchema['properties'][p].keys():
@@ -104,10 +112,12 @@ def get_tasks_only(task_file, task_filter='Allrecipes'):
 def create_file(mcp_server_old, mcp_server_new, func_def, verbose=False):
     with open(mcp_server_old, "r") as src:
         lines = src.readlines()
-
     top_lines, last_lines = lines[:-2], lines[-2:]
     func_lines = [f'{line}\n' for line in func_def.splitlines()]
-    new_lines = top_lines + ['@mcp.tool()\n'] + func_lines + last_lines
+    if len(func_lines) == 0 or 'def' not in func_lines[0]:
+        new_lines = top_lines + last_lines
+    else:
+        new_lines = top_lines + ['@mcp.tool()\n'] + func_lines + last_lines
     new_code = ''.join(new_lines)
     if verbose:
         print(colored(new_code, 'red'))

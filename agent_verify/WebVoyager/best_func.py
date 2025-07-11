@@ -1,143 +1,220 @@
-from bs4 import BeautifulSoup
-import requests
-import urllib.parse
-from mcp.server.fastmcp import FastMCP
-from typing import Any
-
-# MCP server for AllRecipes.com
-mcp = FastMCP('Recipe MCP server')
-
 @mcp.tool()
-def search(query: str) -> Any:
-    """Search for recipes by query string. Returns a list of recipes with title, URL, rating count, and rating value."""
-    search_url = f'https://www.allrecipes.com/search?q={urllib.parse.quote_plus(query, safe="")}'
-
-    response = requests.get(search_url)
-    html_content = response.text
-    result = _parse_search_result(html_content)
-    return result
-
-@mcp.tool()
-def get_recipe_details(recipe_url: str) -> Any:
-    """Get detailed information for a recipe by URL. Returns a dictionary with title, rating, rating count, review count, description, prep time, cook time, total time, servings, yield, ingredients, nutrition facts, and directions."""
-    response = requests.get(recipe_url)
-    html_content = response.text
-    return _parse_recipe_details(html_content)
-
-def _parse_search_result(html_string) -> Any:
-    soup = BeautifulSoup(html_string, 'html.parser')
-    recipes = []
-
-    # Find all recipe cards
-    recipe_cards = soup.find_all(class_='mntl-card-list-card--extendable')
-
-    for card in recipe_cards:
-        url = card['href']
-
-        t = card.find(class_='card__title')
-        title = t.text.strip() if t else None
-
-        t = card.select_one('.mntl-recipe-card-meta__rating-count-number')
-        if t:
-            rating_count_text = t.contents[0].strip()
-            #rating_count = int(rating_count_text)
-            rating_count = rating_count_text
+def get_recipe_ingredients_and_times(recipe_url):
+    '''
+    Given a recipe URL (string), retrieves detailed information for the recipe using get_recipe_details, 
+    and returns a JSON string containing the recipe title, a list of key ingredients (with quantity, unit, and name),
+    and total preparation and cook time (if available).
+    '''
+    import json
+    # Try to convert URL to string (handles if called with non-string types)
+    try:
+        url_str = str(recipe_url)
+        if not url_str.strip():
+            raise ValueError("Empty URL provided.")
+    except Exception as e:
+        return json.dumps({"error": "Invalid recipe_url argument", "exception": str(e)})
+    # Fetch detailed recipe info (as a string)
+    try:
+        details_json_str = get_recipe_details(url_str)
+    except Exception as e:
+        return json.dumps({"error": "Error in fetching recipe details", "exception": str(e)})
+    # Parse the JSON response (usually single-item response list)
+    try:
+        details_list = json.loads(details_json_str)
+        if isinstance(details_list, list) and len(details_list) > 0 and isinstance(details_list[0], dict) and 'text' in details_list[0]:
+            try:
+                details = json.loads(details_list[0]['text']) if isinstance(details_list[0]['text'], str) else details_list[0]['text']
+            except Exception as e:
+                return json.dumps({"error": "Failed to parse details_list[0]['text'] as JSON", "exception": str(e)})
+        elif isinstance(details_list, dict):
+            details = details_list
         else:
-            rating_count = 0
+            return json.dumps({"error": "Recipe details not found or in unexpected format"})
+    except Exception as e:
+        return json.dumps({"error": "Could not parse recipe details", "exception": str(e)})
+    result = {}
+    # Get title
+    result['title'] = details.get('title', '')
+    # Get ingredients (if available and is a list)
+    ingredients = details.get('ingredients', [])
+    # Try to coerce ingredients to a list of dicts if it's in an unexpected format
+    if isinstance(ingredients, str):
+        try:
+            ingredients = json.loads(ingredients)
+        except Exception:
+            ingredients = [ingredients]
+    # Ensure it's a list
+    if not isinstance(ingredients, list):
+        ingredients = [ingredients]
+    result['ingredients'] = ingredients
+    # Get times, ensure strings
+    prep = details.get('prep_time', '')
+    cook = details.get('cook_time', '')
+    total = details.get('total_time', '')
+    result['prep_time'] = str(prep) if prep is not None else ''
+    result['cook_time'] = str(cook) if cook is not None else ''
+    result['total_time'] = str(total) if total is not None else ''
+    try:
+        return json.dumps(result)
+    except Exception as e:
+        # Fallback: just return error
+        return json.dumps({"error": "Could not serialize result to JSON", "exception": str(e), "result": str(result)})
+    
 
-        stars = card.select('.mntl-recipe-star-rating svg')
-        if stars:
-            full_stars = sum(1 for star in stars if 'icon-star' in star['class'] and 'icon-star-half' not in star['class'])
-            half_stars = sum(1 for star in stars if 'icon-star-half' in star['class'])
-            rating = full_stars + 0.5 * half_stars
-        else:
-            rating = 0.0
-
-        recipes.append({
-            'title': title,
-            'url': url,
-            'rating_count': rating_count,
-            'rating_value': rating,
-        })
-
-    return recipes
-
-def _parse_recipe_details(html_content) -> Any:
-    soup = BeautifulSoup(html_content, 'html.parser')
-
-    recipe = {}
-
-    title_tag = soup.find('h1', class_='article-heading')
-    recipe['title'] = title_tag.get_text(strip=True) if title_tag else None
-
-    rating_tag = soup.find('div', class_='mm-recipes-review-bar__rating')
-    #recipe['rating'] = float(rating_tag.get_text(strip=True)) if rating_tag else None
-    recipe['rating'] = rating_tag.get_text(strip=True) if rating_tag else None
-
-    rating_count_tag = soup.find('div', class_='mm-recipes-review-bar__rating-count')
-    #recipe['rating_count'] = int(rating_count_tag.get_text(strip=True).strip('()')) if rating_count_tag else None
-    recipe['rating_count'] = rating_count_tag.get_text(strip=True).strip('()') if rating_count_tag else None
-
-    review_count_tag = soup.find('div', class_='mm-recipes-review-bar__comment-count')
-    #recipe['review_count'] = int(review_count_tag.get_text(strip=True).split()[0]) if review_count_tag else None
-    recipe['review_count'] = review_count_tag.get_text(strip=True).split()[0] if review_count_tag else None
-
-    # Extract description
-    description_tag = soup.find('p', class_='article-subheading')
-    recipe['description'] = description_tag.get_text(strip=True) if description_tag else None
-
-    label_map = {
-        'Prep Time': 'prep_time',
-        'Cook Time': 'cook_time',
-        'Total Time': 'total_time',
-        'Servings': 'servings',
-        'Yield': 'yield'
-    }
-
-    items = soup.find_all('div', class_='mm-recipes-details__item')
-    for item in items:
-        label = item.find('div', class_='mm-recipes-details__label').get_text(strip=True).rstrip(':')
-        value = item.find('div', class_='mm-recipes-details__value').get_text(strip=True)
-        if label in label_map:
-            recipe[label_map[label]] = value
-
-    ingredients = []
-    ingredient_items = soup.find_all('li', class_='mm-recipes-structured-ingredients__list-item')
-    for item in ingredient_items:
-        quantity = item.find('span', attrs={'data-ingredient-quantity': True})
-        unit = item.find('span', attrs={'data-ingredient-unit': True})
-        name = item.find('span', attrs={'data-ingredient-name': True})
-
-        ingredient = {
-            'quantity': quantity.get_text(strip=True) if quantity else '',
-            'unit': unit.get_text(strip=True) if unit else '',
-            'name': name.get_text(strip=True) if name else ''
-        }
-        ingredients.append(ingredient)
-
-    recipe['ingredients'] = ingredients
-
-    rows = soup.select('tr.mm-recipes-nutrition-facts-summary__table-row')
-
-    nutrition_facts = {}
-    for row in rows:
-        cells = row.find_all('td')
-        if len(cells) == 2:
-            value = cells[0].get_text(strip=True)
-            nutrient = cells[1].get_text(strip=True)
-            nutrition_facts[nutrient] = value
-    recipe['nutrition_facts'] = nutrition_facts
-
-    # Find all list items within the ordered list
-    directions_section = soup.find(id='mm-recipes-steps_1-0')
-    steps = directions_section.find_all('li') if directions_section else []
-
-    # Extract text from each step
-    step_texts = [step.get_text(strip=True) for step in steps]
-    recipe['directions'] = step_texts
-
-    return recipe
-
+def filter_recipes(recipes_json_str, min_rating=None, min_reviews=None, max_calories=None, max_prep_time=None, required_ingredients=None, min_servings=None):
+    import json
+    import re
+    # NEW: Accept input as Python list/dict or string. If list/dict, convert to JSON string.
+    if isinstance(recipes_json_str, (list, dict)):
+        try:
+            recipes_json_str = json.dumps(recipes_json_str)
+        except Exception as e:
+            return json.dumps({'error': 'Could not convert input list/dict to JSON string: %s' % str(e)})
+    try:
+        if not isinstance(recipes_json_str, str):
+            recipes_json_str = str(recipes_json_str)
+        # Remove any leading/trailing whitespace before parsing
+        recipes = json.loads(recipes_json_str.strip())
+        if not isinstance(recipes, list):
+            raise ValueError("recipes_json_str does not contain a list")
+    except Exception as e:
+        return json.dumps({"error": f"Failed to parse recipes_json_str: {str(e)}"})
+    def parse_number(val):
+        try:
+            if val is None:
+                return None
+            if isinstance(val, (int, float)):
+                return val
+            val = str(val).replace(",", "").strip()
+            if val == '':
+                return None
+            if "." in val:
+                return float(val)
+            return int(val)
+        except Exception as e:
+            return None
+    def parse_time_to_minutes(time_str):
+        if time_str is None:
+            return None
+        try:
+            if isinstance(time_str, (int, float)):
+                return int(time_str)
+            time_str = str(time_str).lower().strip()
+            if time_str == "":
+                return None
+            # Try HH:MM:SS
+            m = re.match(r"^(\d+):(\d+):(\d+)$", time_str)
+            if m:
+                h, mi, s = map(int, m.groups())
+                return h*60+mi+(s//60)
+            minutes = 0
+            h_match = re.search(r"(\d+)\s*hr", time_str)
+            if h_match:
+                minutes += int(h_match.group(1))*60
+            m_match = re.search(r"(\d+)\s*min", time_str)
+            if m_match:
+                minutes += int(m_match.group(1))
+            if minutes==0:
+                n = parse_number(time_str)
+                if n is not None:
+                    minutes = int(n)
+            return minutes if minutes>0 else None
+        except Exception as e:
+            return None
+    def ingredient_in_recipe(recipe, req_ingredient):
+        if not req_ingredient:
+            return True
+        req_ingredient = req_ingredient.lower()
+        if "ingredients" in recipe:
+            for ing in recipe["ingredients"]:
+                try:
+                    if isinstance(ing, dict) and "name" in ing:
+                        line = ing["name"].lower()
+                    else:
+                        line = str(ing).lower()
+                    if req_ingredient in line:
+                        return True
+                except Exception:
+                    continue
+            return False
+        return True
+    def get_float(val):
+        if val is None:
+            return None
+        try:
+            return float(val)
+        except Exception:
+            try:
+                return float(parse_number(val))
+            except Exception:
+                return None
+    def get_int(val):
+        if val is None:
+            return None
+        try:
+            return int(val)
+        except Exception:
+            try:
+                return int(float(val))
+            except Exception:
+                return None
+    def get_str(val):
+        if val is None:
+            return None
+        return str(val)
+    min_rating = get_float(min_rating)
+    min_reviews = get_int(min_reviews)
+    max_calories = get_float(max_calories)
+    max_prep_time = get_str(max_prep_time)
+    required_ingredients = get_str(required_ingredients)
+    min_servings = get_int(min_servings)
+    req_ings = []
+    if required_ingredients:
+        req_ings = [ri.strip() for ri in required_ingredients.split(',') if ri.strip()]
+    results = []
+    for recipe in recipes:
+        try:
+            if min_rating is not None:
+                rating_val = parse_number(recipe.get("rating_value", recipe.get("rating", 0)))
+                if rating_val is None or rating_val < min_rating:
+                    continue
+            if min_reviews is not None:
+                rc = parse_number(recipe.get("rating_count", recipe.get("review_count", 0)))
+                if rc is None or rc < min_reviews:
+                    continue
+            if max_calories is not None:
+                cals = None
+                if 'nutrition_facts' in recipe and isinstance(recipe["nutrition_facts"], dict):
+                    cals = parse_number(recipe["nutrition_facts"].get("Calories", None))
+                elif "calories" in recipe:
+                    cals = parse_number(recipe["calories"])
+                if cals is not None and cals > max_calories:
+                    continue
+            if max_prep_time is not None:
+                rprep = recipe.get("prep_time") or recipe.get("total_time") or recipe.get("cook_time")
+                rpmins = parse_time_to_minutes(rprep)
+                mpmins = parse_time_to_minutes(max_prep_time)
+                if rpmins is not None and mpmins is not None and rpmins > mpmins:
+                    continue
+            passed = True
+            for ri in req_ings:
+                if not ingredient_in_recipe(recipe, ri):
+                    passed = False
+                    break
+            if not passed:
+                continue
+            if min_servings is not None:
+                servings = parse_number(recipe.get("servings", None))
+                if servings is not None and servings < min_servings:
+                    continue
+            results.append(recipe)
+        except Exception as e:
+            continue
+    try:
+        return json.dumps(results)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to serialize results: {str(e)}"})
+    
 
 @mcp.tool()
 def filter_recipes(recipe_list_str, min_rating_str=None, min_reviews_str=None, max_calories_str=None, must_have_ingredients_str=None, exclude_ingredients_str=None, max_prep_minutes_str=None, min_servings_str=None):
@@ -307,7 +384,9 @@ def filter_recipes(recipe_list_str, min_rating_str=None, min_reviews_str=None, m
         return json.dumps(filtered)
     except Exception as e:
         return json.dumps({'error': f'Could not serialize filtered recipes: {e}'})
-@mcp.tool()
+    
+
+
 def extract_ingredients_and_steps(recipe_details_str):
     """
     Given a detailed recipe dictionary (as string or dict), this function extracts and returns a standardized list of key ingredients (with quantities, units, and names) and a list of preparation or cooking steps/directions.
@@ -358,6 +437,7 @@ def extract_ingredients_and_steps(recipe_details_str):
             "trace": traceback.format_exc(),
             "input": str(recipe_details_str)
         })
+    
 @mcp.tool()
 def extract_nutrition_label(recipe_details_str):
     """
@@ -430,6 +510,8 @@ def extract_nutrition_label(recipe_details_str):
             "input_keys": list(details.keys())
         })
     return json.dumps(nutrition_label)
+
+
 @mcp.tool()
 def extract_reviews(recipe_details_str):
     '''
@@ -523,6 +605,7 @@ def extract_reviews(recipe_details_str):
     except Exception:
         pass
     return json.dumps(out)
+
 @mcp.tool()
 def extract_total_time_and_servings(recipe_details_str):
     """
@@ -646,83 +729,3 @@ def extract_recipe_summary(recipe_details_str):
         return json.dumps(summary)
     except Exception as e:
         return json.dumps({'error': f'Failed to serialize summary: {str(e)}', 'summary': str(summary)})
-@mcp.tool()
-def get_recipe_by_criteria(query_str, min_rating_str=None, min_reviews_str=None, max_calories_str=None, must_have_ingredients_str=None, exclude_ingredients_str=None, max_prep_minutes_str=None, min_servings_str=None):
-    """
-    Improved function for LLM robustness: This function accepts various filtering parameters for recipe search as (possibly) string inputs. It attempts to coerce types and parses ingredient lists robustly. If arguments are invalid or cannot be coerced, it returns clear error information.
-    """
-    import json
-    def to_float(val):
-        if val is None:
-            return None
-        try:
-            return float(val)
-        except (ValueError, TypeError):
-            return None
-    def to_int(val):
-        if val is None:
-            return None
-        try:
-            return int(float(val))
-        except (ValueError, TypeError):
-            return None
-    def to_list(val):
-        if val is None:
-            return None
-        if isinstance(val, list):
-            return val
-        if isinstance(val, str):
-            # Remove accidental quotes or brackets
-            clean_val = val.strip().strip("[]{}()'")
-            if not clean_val:
-                return []
-            return [s.strip() for s in clean_val.split(",") if s.strip()]
-        return None
-    try:
-        min_rating = to_float(min_rating_str)
-        min_reviews = to_int(min_reviews_str)
-        max_calories = to_int(max_calories_str)
-        max_prep_minutes = to_int(max_prep_minutes_str)
-        min_servings = to_int(min_servings_str)
-        must_have_ingredients = to_list(must_have_ingredients_str)
-        exclude_ingredients = to_list(exclude_ingredients_str)
-    except Exception as e:
-        return json.dumps({"error": f"Type conversion error: {e}"})
-    try:
-        search_results = -search(query_str)
-        recipe_list = []
-        if isinstance(search_results, str):
-            try:
-                recipe_list.append(json.loads(search_results))
-            except Exception as e:
-                return json.dumps({"error": f"Search results JSON decode error: {e}", "result": search_results})
-        elif isinstance(search_results, list):
-            for item in search_results:
-                if isinstance(item, dict) and 'text' in item:
-                    try:
-                        recipe_list.append(json.loads(item['text']))
-                    except Exception as e:
-                        continue
-                else:
-                    try:
-                        recipe_list.append(json.loads(item))
-                    except Exception:
-                        continue
-        else:
-            return json.dumps({"error": "Unexpected search result type.", "details": str(type(search_results))})
-        recipe_list_str = json.dumps(recipe_list)
-        filtered_json = -filter_recipes(
-            recipe_list_str,
-            min_rating_str=str(min_rating) if min_rating is not None else None,
-            min_reviews_str=str(min_reviews) if min_reviews is not None else None,
-            max_calories_str=str(max_calories) if max_calories is not None else None,
-            must_have_ingredients_str=",").join(must_have_ingredients) if must_have_ingredients is not None else None,
-            exclude_ingredients_str=",").join(exclude_ingredients) if exclude_ingredients is not None else None,
-            max_prep_minutes_str=str(max_prep_minutes) if max_prep_minutes is not None else None,
-            min_servings_str=str(min_servings) if min_servings is not None else None
-        )
-        return filtered_json
-    except Exception as e:
-        return json.dumps({"error": f"Unexpected error in recipe retrieval/filtering: {e}"})
-if __name__ == "__main__":
-    mcp.run(transport='stdio')

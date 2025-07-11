@@ -213,6 +213,9 @@ async def call_mcp_tool(mcp_client:Client, function_name, function_args):
     resp_items = []
     try:
         async with mcp_client:
+            keys = list(function_args.keys())
+            for key in keys:
+                function_args[key] = str(function_args[key])
             print(f"Function Name: {function_name} Function Args: {function_args}")
             func_response = await mcp_client.call_tool(function_name, function_args)
             func_response = func_response.content
@@ -244,7 +247,10 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
     step = 1
     final_result = None
 
-    while True:
+    MAX_STEPS = 3
+    goal_achieved = False
+
+    while step < MAX_STEPS:
         response = agent.improve_trajectory(goal, trajectory, history, old_funcs, new_funcs)
         llm_response = agent.json_fixer.fix_json_response(response)
         if isinstance(llm_response, str):
@@ -276,6 +282,7 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
             
             result = await call_mcp_tool(mcp_client, func_name, args)
             print(colored(f"Result: {result}", 'green'))
+            
         final_result = result
         
         # Update history
@@ -286,6 +293,9 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
             "result": result
         })
         step += 1
+        if 'error' in result or 'Error' in result:
+            goal_achieved = False
+            break
 
     return {
         "final_result": final_result,
@@ -294,40 +304,49 @@ async def improve_trajectory(task, mcp_client, old_funcs, new_funcs):
         }
 
 
+
 def improve_trajectories(tasks, mcp_client, old_funcs, new_funcs, improved_logs_folder, chunk_size=5):
+    return asyncio.run(improve_trajectories_(tasks, mcp_client, old_funcs, new_funcs, improved_logs_folder, chunk_size))
+
+
+async def improve_trajectories_(tasks, mcp_client, old_funcs, new_funcs, improved_logs_folder, chunk_size=5):
     # mcp_client = Client(mcp_server)
+    
     task_count = chunk_size # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     count = task_count
-    for task in tasks:
-        if count <= 0:
-            break
-        count -= 1
 
-        print(task['id'])
-        log_file = os.path.normpath(f"{improved_logs_folder}/log_{task['id']}.txt")
+    async with mcp_client:
+        for task in tasks:
+            if count <= 0:
+                break
+            count -= 1
+
+            print(task['id'])
+            log_file = os.path.normpath(f"{improved_logs_folder}/log_{task['id']}.txt")
 
 
-        # if os.path.exists(log_file):
-        #     continue
-        sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
-        user_input = task['query']
-        print(f"Executing task: {user_input}")
-        try:
-            result = asyncio.run(improve_trajectory(task, mcp_client, old_funcs, new_funcs))
-        except Exception as e:
-            traceback.print_exc()
-            result = None
-            continue
-        if result is None or isinstance(result, str) or 'final_result' not in result.keys():
-            print(result, type(result))
-        print(f"\nFinal Result: {result['final_result']}")
-        print(f"\nSteps taken: {result['step']}, Goal Achieved: {result['goal_achieved']}")
+            # if os.path.exists(log_file):
+            #     continue
 
-        print("\n" + "="*50 + "\n")
- 
-        
-        sys.stdout.close()  # Close the suppressed stdout
-        sys.stdout = sys.__stdout__  # Restore original stdout
+            sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
+            user_input = task['query']
+            print(f"Executing task: {user_input}")
+            try:
+                result = await improve_trajectory(task, mcp_client, old_funcs, new_funcs)
+            except Exception as e:
+                traceback.print_exc()
+                result = None
+                continue
+            if result is None or isinstance(result, str) or 'final_result' not in result.keys():
+                print(result, type(result))
+            print(f"\nFinal Result: {result['final_result']}")
+            print(f"\nSteps taken: {result['step']}, Goal Achieved: {result['goal_achieved']}")
+
+            print("\n" + "="*50 + "\n")
+    
+            
+            sys.stdout.close()  # Close the suppressed stdout
+            sys.stdout = sys.__stdout__  # Restore original stdout
 
 
 def correct_function(task_id):
@@ -355,7 +374,7 @@ def check_trajectory(trajectory, new_func_name):
     stop_called = False 
     final_answer_present = False
     for line in lines:
-        if 'Final Result' in line:
+        if 'Final Result' in line and 'error' not in line and 'Error' not in line:
             final_answer_present = True
             return no_error
         if 'Task complete or LLM indicated to stop.' in line:
@@ -363,7 +382,7 @@ def check_trajectory(trajectory, new_func_name):
         if new_func_name in line:
             func_called = True
         if func_called and "Result" in line:
-            if 'Result: []' in line or 'error' in line or 'Error' in line:
+            if 'Result: []' in line or 'error' in line or 'Error' in line or '"text": "[]"' in line:
                 return error_in_func
             else:
                 func_called = False
