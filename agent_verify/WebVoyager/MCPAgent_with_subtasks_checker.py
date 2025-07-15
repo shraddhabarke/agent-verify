@@ -8,8 +8,48 @@ import re
 import sys
 import argparse
 import os
-
+from termcolor import colored
 from agent_verify.agent import Agent
+
+def read_formalized_tasks(task_filter='Allrecipes'):
+    file_name = f'formalized_tasks_{task_filter}.json'
+    tasks = json.loads(open(file_name).read())
+    new_tasks = []
+    for task in tasks:
+        new_task = []
+        for key in task.keys():
+            new_task.append(task[key])
+        new_tasks.append(new_task)
+    return new_tasks
+
+class SubtaskChecker(Agent):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def check_subtask(self, history, subtask, constraints):
+        system_prompt = f'''
+You are a helpful assistant.
+A customer is interacting with a customer support agent with their request.
+From the customer's request, we have extracted a subtask that must be satisfied somewhere through the solution steps.
+Your job is to check whether the specific subtask has yet been solved or not.  
+The task also comes with a set of constraints. The task is solved if all the constraints are met.    
+We will provide you with the steps taken by the customer agent so far.
+We will also provide you with the subtask that needs to be checked.
+Return your answer in the following json format:
+{{
+    "solved": <True or False>,
+    "reason": <reason>
+}}  
+'''
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": f'Steps taken: \n{history}\n\nSubtask: \n{subtask}\n\nAssociated constraints: \n{constraints}\n\n'}]
+        res = self.llm_client.complete(model = self.model_name, messages=messages, response_format="json_object").choices[0].message['content']
+        res = json.loads(res)
+        # print(colored(res, 'magenta'))
+        return res
+    
+    def check_subtasks(self, history, subtasks):
+        res = [self.check_subtask(history, subtask['task'], subtask['constraints']) for subtask in subtasks]
+        return [i['solved'] for i in res], [i['reason'] for i in res]
 
 # An AI agent that uses Azure OpenAI to call functions from a MCP server
 class WebVoyagerAgent(Agent):
@@ -187,7 +227,7 @@ Respond with JSON in this format:
 Set "goal_achieved": true when the user goal is achieved, otherwise false.
 """
 
-    async def execute_task(self, mcp_server:str, user_task:str):
+    async def execute_task(self, mcp_server:str, user_task:str, subtasks):
         """
         Execute a user-defined task by calling the appropriate function from AllRecipes.py.
         Returns the result of the function call.
@@ -199,6 +239,8 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
         final_result = None
 
         mcp_client = Client(mcp_server)
+        subtask_checker = SubtaskChecker()
+
 
         async with mcp_client:
             tools = await mcp_client.list_tools()
@@ -207,6 +249,8 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
             ])
 
             system_prompt = self.get_system_prompt(tool_descriptions)
+            # print(colored(f"Goal: {goal}", 'blue'))
+            # print(colored(f"Subtasks: {subtasks}", 'magenta'))
 
             while True:
                 # Ask LLM which function to call next
@@ -239,7 +283,7 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
                         print(f"Reason: {explanation}")
                     
                     result = await self.call_mcp_tool(mcp_client, func_name, args)
-                    print(f"Result: {result}")
+                    # print(f"Result: {result}")
                 # print(f"Result: {result}")
                 final_result = result
                 
@@ -252,13 +296,24 @@ Set "goal_achieved": true when the user goal is achieved, otherwise false.
                 })
                 step += 1
 
+                subtasks_solved, subtasks_solved_reason = subtask_checker.check_subtasks(history, subtasks)
+                print(f'Subtasks: {subtasks}')
+                print(f'Subtasks Solved: {subtasks_solved}')
+                print(f'Subtasks Solved Reason: {subtasks_solved_reason}')
+                # kdkdjf
+
+                for i in range(len(subtasks_solved)-1, -1, -1):
+                    if subtasks_solved[i]:
+                        del subtasks[i]
+
+        # kudhf
         return {
             "final_result": final_result,
             "step": step - 1,
             "goal_achieved": goal_achieved
             }
 
-def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
+def main(mcp_server='AllRecipes.py', logs_folder='logs_with_subtasks'):
     folder_path = "agent_verify/WebVoyager"
     task_file = os.path.join(folder_path, 'WebVoyager_data.jsonl')
     # mcp_server = os.path.join(folder_path, mcp_server)
@@ -267,22 +322,25 @@ def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
         mcp_server = os.path.join(folder_path, mcp_server)
 
     # mcp_server = "agent_verify/WebVoyager/mcp_server/server.py"
-    task_count = 1 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
+    task_count = 1000 # how many tasks that match the filter to execute; put a large number if you want to execute all tasks
     task_filter = 'Allrecipes'
     agent = WebVoyagerAgent()
+
+    formalized_tasks_all = read_formalized_tasks(task_filter)
 
 
     with open(task_file, 'r', encoding='utf-8') as f:
         task_data = [json.loads(line) for line in f if line.strip()]
     
     count = task_count
-    for task in task_data:
+    for task_index, task in enumerate(task_data):
         if task['web_name'] != task_filter:
             continue
         if count <= 0:
             break
 
         print(task['id'])
+        subtasks = formalized_tasks_all[task_index]
         log_file = os.path.join(folder_path, f"{logs_folder}/log_{task['id']}.txt")
         intent_file = os.path.join(folder_path, f"formal_intents/log_{task['id']}.txt")
         intent = open(intent_file, encoding="utf-8").read()
@@ -291,7 +349,7 @@ def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
         sys.stdout = open(log_file, 'w', encoding='utf-8')  # Suppress stdout for cleaner output
         user_input = task['ques']
         print(f"Executing task: {user_input}")
-        result = asyncio.run(agent.execute_task(mcp_server, intent))
+        result = asyncio.run(agent.execute_task(mcp_server, intent, subtasks))
         print(f"\nFinal Result: {result['final_result']}")
         print(f"\nSteps taken: {result['step']}, Goal Achieved: {result['goal_achieved']}")
 
@@ -303,8 +361,8 @@ def main(mcp_server='AllRecipes.py', logs_folder='logs_temp'):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("mcp_server", nargs="?", default="AllRecipes_test.py", help="Optional script name")
-    parser.add_argument("logs_folder", nargs="?", default="logs_temp", help="Optional script name")
+    parser.add_argument("mcp_server", nargs="?", default="AllRecipes.py", help="Optional script name")
+    parser.add_argument("logs_folder", nargs="?", default="logs_with_subtasks", help="Optional script name")
     args = parser.parse_args()
 
     assert(args.mcp_server in ["AllRecipes_test.py", "AllRecipes.py"])    

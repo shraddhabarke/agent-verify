@@ -111,7 +111,6 @@ def main():
 
             print(old_trajectory_file)
             print(new_trajectory_file)
-            # kjf
 
             improved_func_def = ''
             function_improvement_trial = 0
@@ -120,10 +119,6 @@ def main():
                 improved_func_def, explanation = lib_gen.correct_func_from_traj(old_library, new_func_def, task, old_trajectory, new_trajectory, new_func_def_history)
                 function_improvement_trial += 1
             new_func_def = improved_func_def
-            # if 'def' not in new_func_def:
-            #     break_flag = False
-            #     break
-            # new_func_def = lib_gen.correct_func_from_traj(old_library, new_func_def, task, old_trajectory, new_trajectory)
 
             print(colored(f'Corrected proposed function: {new_func_def}', 'green'))
             print(colored(f'Explanation: {explanation}', 'red'))
@@ -135,8 +130,6 @@ def main():
         
         if break_flag:
             create_file(new_mcp_server, old_mcp_server, "")
-            # with open(new_mcp_server, 'r', encoding='utf-8') as src, open(old_mcp_server, 'w', encoding='utf-8') as dst:
-            #     dst.write(src.read())
 
 
 if __name__ == "__main__":
