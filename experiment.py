@@ -3,8 +3,21 @@ import agent_verify.WebVoyager.MCPAgent as mcp_agent
 from termcolor import colored
 from dsl_gen.utils import *
 from dsl_gen.improve_trajectories import improve_trajectories, check_trajectory
+from agent_verify.WebVoyager.MCPAgent import *
+from tabulate import tabulate
+from test_mcp import *
 
 MAX_REFINEMENT_TRIES = 5
+
+class Metrics:
+    def __init__(self):
+        pass
+
+    def compute_metrics(old_trajectories, new_trajectories, new_funcs):
+        pass
+
+
+
 
 def main():
     original_logs_with_results = "agent_verify/WebVoyager/logs_with_results"
@@ -15,23 +28,25 @@ def main():
     original_mcp_server = os.path.normpath('agent_verify/WebVoyager/AllRecipes.py')
     old_mcp_server = os.path.normpath('agent_verify/WebVoyager/AllRecipes_test.py')
     new_mcp_server = os.path.normpath('agent_verify/WebVoyager/AllRecipes_test2.py')
-    tasks_with_original_trajectories = get_tasks(original_logs_with_results, task_file, task_filter)
+    train_tasks = get_tasks(original_logs_with_results, task_file, task_filter)[:24]
+    test_tasks = get_tasks_only(task_file, task_filter)[24:]
+
 
     open(old_mcp_server, 'w').close()
     create_file(original_mcp_server, old_mcp_server, '')
     
-    chunk_size = 5
-    i = -chunk_size
+    train_chunck_size = 3
+    i = -train_chunck_size
     iteration = 0
     while(True):
         iteration += 1
         print(iteration)
-        i+=chunk_size
+        i+=train_chunck_size
         
         ######### TASKS AND TOOLS #######
         tools = get_tools(old_mcp_server)
         old_library = Library(tools).get_funcs()
-        tasks = tasks_with_original_trajectories[i:i+chunk_size]
+        tasks = train_tasks[i:i+train_chunck_size]
         
         # open(new_mcp_server, 'w').close()
         
@@ -57,16 +72,17 @@ def main():
             new_library = old_library + [new_func_def]
             open(new_mcp_server, 'w').close()
             create_file(old_mcp_server, new_mcp_server, new_func_def)
-            client = Client(new_mcp_server)
 
             traj_results = []
             index = -1
-            for j in range(chunk_size):
-                client = Client(new_mcp_server)
+            for j in range(train_chunck_size):
                 print(colored(tasks[j]['id'], 'green'))
-                improve_trajectories([tasks[j]], client, old_library, new_library, improved_logs_folder, chunk_size)
-                trajectory_file = os.path.normpath(f"{improved_logs_folder}/log_{tasks[j]['id']}.txt")
-                trajectory = open(trajectory_file, encoding='utf-8').read()
+                new_trajectory_file = os.path.normpath(f"{improved_logs_folder}/log_{tasks[j]['id']}.txt")
+                improved_trajectory_logs = improve_trajectories([tasks[j]], new_mcp_server, old_library, new_library)
+                trajectory = improved_trajectory_logs[tasks[j]['id']]
+                with open(new_trajectory_file, "w", encoding="utf-8") as f:
+                    json.dump(trajectory, f, ensure_ascii=False, indent=4)
+                
                 traj_results.append(check_trajectory(trajectory, new_func_name))
                 print(colored(f'Trajectory check results: {traj_results[j]}', 'cyan'))
                 if traj_results[j] == 2:
@@ -76,38 +92,15 @@ def main():
             if index==-1:
                 break_flag = True
             if break_flag:
-                break       
-
-            # # if not break_flag:
-
-
-            # improve_trajectories(tasks, client, old_library, new_library, improved_logs_folder, chunk_size)
-            # traj_results = []
-            # for j in range(chunk_size):
-            #     # print(j)
-            #     trajectory_file = os.path.normpath(f"{improved_logs_folder}/log_{tasks[j]['id']}.txt")
-            #     trajectory = open(trajectory_file, encoding='utf-8').read()
-            #     traj_results.append(check_trajectory(trajectory, new_func_name))
+                break      
             
-            # print(colored(traj_results, 'cyan'))
-
-            # if len(traj_results) == 0:
-            #     break_flag = True
-            #     break
-            # index = -1
-            # for j in range(len((traj_results))):
-            #     if traj_results[j] == 2:
-            #         index = j
-            #         break
-            # if index == -1:
-            #     break_flag = True
-            #     break
             print("wrong trajectory", tasks[index]['id'])
             task = tasks[index]['query']
             old_trajectory_file = os.path.normpath(f"{original_logs_with_results}/log_{tasks[index]['id']}.txt")
             new_trajectory_file = os.path.normpath(f"{improved_logs_folder}/log_{tasks[index]['id']}.txt")
             old_trajectory = open(old_trajectory_file, encoding='utf-8').read()
-            new_trajectory = open(new_trajectory_file, encoding='utf-8').read()
+            old_trajectory = train_tasks[i+index]
+            new_trajectory = trajectory
 
             print(old_trajectory_file)
             print(new_trajectory_file)
@@ -126,20 +119,17 @@ def main():
             new_func_def_history.append({"role": "user", "content": f'Failed task: \n{task}\nOld Trajectory: \n{old_trajectory}\nNew Trajectory: \n{new_trajectory}'})
             new_func_def_history.append({"role": "assistant", "content": f'Corrected function: \n{new_func_def}, Explanation: \n{explanation}'})
 
-            print(new_func_def_history)
         
         if break_flag:
             create_file(new_mcp_server, old_mcp_server, "")
 
+            test_logs = test_mcp(test_tasks, new_mcp_server)
+            test_logs_file = f'agent_verify/WebVoyager/test_logs_2/trial_{iteration}.txt'
+            with open(test_logs_file, "w", encoding="utf-8") as f:
+                json.dump(test_logs, f, ensure_ascii=False, indent=4)
+            # with open(test_logs_file, "w", encoding="utf-8") as f:
+            #     f.write(repr(test_logs))
+
 
 if __name__ == "__main__":
     main()
-    # improved_logs_folder = "agent_verify/WebVoyager/improved_logs"
-    # traj_results = []
-    # new_func_name = 'filter_recipes'
-    # for j in range(5):
-    #     # print(j)
-    #     trajectory_file = os.path.normpath(f"{improved_logs_folder}/log_Allrecipes--{j}.txt")
-    #     trajectory = open(trajectory_file, encoding='utf-8').read()
-    #     traj_results.append(check_trajectory(trajectory, new_func_name))
-    # print(traj_results)

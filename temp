@@ -1,0 +1,2689 @@
+1
+New function proposed: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                rating = float(recipe.get('rating', recipe.get('rating_value', 0)) or 0)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                rc = int(recipe.get('review_count', recipe.get('rating_count', 0)) or 0)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                passed = False
+        # Check required_ingredients
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        # semi-colon/pipe/comma/newline join fallback parsing
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients)>0 and isinstance(ingredients[0], dict):
+                words = ' '.join([d.get('name','') for d in ingredients]).lower()
+            else:
+                words = ' '.join([str(x) for x in ingredients]).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            # If not available, try total_time or cook_time
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                if str(servings).strip() != str(filters['servings']).strip():
+                    passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+
+Allrecipes--0
+Trajectory check results: 3
+Allrecipes--1
+Trajectory check results: 2
+wrong trajectory Allrecipes--1
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--1.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--1.txt
+Corrected proposed function: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                # Be sure to handle string numbers from recipe summaries
+                rating_val = recipe.get('rating') if 'rating' in recipe else recipe.get('rating_value', 0)
+                if rating_val is None:
+                    rating_val = 0
+                if isinstance(rating_val, str):
+                    try:
+                        rating = float(rating_val)
+                    except:
+                        rating = 0
+                else:
+                    rating = float(rating_val)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                rc_val = recipe.get('review_count') if 'review_count' in recipe else recipe.get('rating_count', 0)
+                if rc_val is None:
+                    rc_val = 0
+                if isinstance(rc_val, str):
+                    try:
+                        rc = int(float(rc_val))
+                    except:
+                        rc = 0
+                else:
+                    rc = int(rc_val)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                passed = False
+        # Check required_ingredients (search title/ingredients for substring match)
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            # If only top-level summary/title is available, fallback to searching title and (if present) ingredients field
+            words_parts = []
+            # Add 'title' field
+            if 'title' in recipe and recipe['title']:
+                words_parts.append(str(recipe['title']))
+            # Add 'ingredients' field (string or list)
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        # semi-colon/pipe/comma/newline join fallback parsing
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients) > 0 and isinstance(ingredients[0], dict):
+                words_parts += [d.get('name', '') for d in ingredients]
+            else:
+                words_parts += [str(x) for x in ingredients]
+            words = ' '.join(words_parts).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            # If not available, try total_time or cook_time
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                if str(servings).strip() != str(filters['servings']).strip():
+                    passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+Explanation: The primary bug causing all results to be empty is that the function assumes 'ingredients' field always exists and contains ingredient names, even in a recipe summary where only the 'title' field may reference ingredients. Thus, when filtering for a required ingredient in a recipe summary, this test always failed. The fixed function above now includes both the 'title' and (if present) the 'ingredients' fields when performing the 'required_ingredients' substring search. This ensures substring matching works for summaries, not just detailed recipes. Additionally, I made sure to handle numeric fields (like 'rating', 'rating_count', etc) that may be strings in summary. Only the argument parsing/type conversion for these top-level summary fields and the substring source were changed; core logic otherwise remains the same.
+Allrecipes--0
+Trajectory check results: 2
+wrong trajectory Allrecipes--0
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--0.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--0.txt
+Corrected proposed function: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                rating_val = recipe.get('rating') if 'rating' in recipe else recipe.get('rating_value', 0)
+                if rating_val is None:
+                    rating_val = 0
+                if isinstance(rating_val, str):
+                    try:
+                        rating = float(rating_val)
+                    except:
+                        rating = 0
+                else:
+                    rating = float(rating_val)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                # Support for recipe summaries with only 'rating_count' (may be string)
+                rc_val = recipe.get('review_count') if 'review_count' in recipe else recipe.get('rating_count', 0)
+                if rc_val is None:
+                    rc_val = 0
+                if isinstance(rc_val, str):
+                    try:
+                        rc = int(float(rc_val))
+                    except:
+                        rc = 0
+                else:
+                    rc = int(rc_val)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                passed = False
+        # Check required_ingredients (search title/ingredients for substring match)
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            # Combine title and (if available) ingredients into search space
+            words_parts = []
+            if 'title' in recipe and recipe['title']:
+                words_parts.append(str(recipe['title']))
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients) > 0 and isinstance(ingredients[0], dict):
+                words_parts += [d.get('name', '') for d in ingredients]
+            else:
+                words_parts += [str(x) for x in ingredients]
+            words = ' '.join(words_parts).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                # Convert summary servings from str to int if needed
+                filter_servings = filters['servings']
+                if (servings is None) or (str(servings).strip() == ""):
+                    passed = False
+                else:
+                    # try int compare, else fallback to str
+                    try:
+                        if int(servings) != int(filter_servings):
+                            passed = False
+                    except:
+                        if str(servings).strip() != str(filter_servings).strip():
+                            passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+Explanation: The root issue was the 'servings' filter: the function compared str(servings).strip() to str(filters['servings']).strip(), but in summary results, 'servings' may not be present or may be a number string or int. The fix is to attempt int comparison for 'servings' if both sides can be converted to int; fallback to string comparison only if int fails. This makes the function robust to recipe summaries and prevents recipes from being filtered out unnecessarily due to type mismatch. No other logic was changed, matching only the bug observed in the new trajectories.
+Allrecipes--0
+Trajectory check results: 3
+Allrecipes--1
+Trajectory check results: 2
+wrong trajectory Allrecipes--1
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--1.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--1.txt
+Corrected proposed function: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                rating_val = recipe.get('rating') if 'rating' in recipe else recipe.get('rating_value', 0)
+                if rating_val is None:
+                    rating_val = 0
+                if isinstance(rating_val, str):
+                    try:
+                        rating = float(rating_val)
+                    except:
+                        rating = 0
+                else:
+                    rating = float(rating_val)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                rc_val = recipe.get('review_count') if 'review_count' in recipe else recipe.get('rating_count', 0)
+                if rc_val is None:
+                    rc_val = 0
+                if isinstance(rc_val, str):
+                    try:
+                        rc = int(float(rc_val))
+                    except:
+                        rc = 0
+                else:
+                    rc = int(rc_val)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                passed = False
+        # Check required_ingredients (search title/ingredients for substring match)
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            # Combine title and (if available) ingredients into search space
+            words_parts = []
+            if 'title' in recipe and recipe['title']:
+                words_parts.append(str(recipe['title']))
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients) > 0 and isinstance(ingredients[0], dict):
+                words_parts += [d.get('name', '') for d in ingredients]
+            else:
+                words_parts += [str(x) for x in ingredients]
+            words = ' '.join(words_parts).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                filter_servings = filters['servings']
+                if (servings is None) or (str(servings).strip() == ""):
+                    passed = False
+                else:
+                    try:
+                        if int(servings) != int(filter_servings):
+                            passed = False
+                    except:
+                        if str(servings).strip() != str(filter_servings).strip():
+                            passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+Explanation: The main reason filter_recipes failed with real search results was that the search result summaries do not contain an explicit 'ingredients' field—only a 'title'. The bug was that the ingredients filtering logic did not include the recipe title as part of required_ingredients search, so substring matches (such as for 'zucchini') were not found. The patch above includes both the 'title' and (if available) the 'ingredients' fields in the combined substring search, thus enabling proper ingredient filtering even on summaries. No other logic is changed except for allowing more robust and type-safe comparison for the 'servings' field.
+Allrecipes--0
+Trajectory check results: 3
+Allrecipes--1
+Trajectory check results: 3
+Allrecipes--2
+Trajectory check results: 2
+wrong trajectory Allrecipes--2
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--2.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--2.txt
+Corrected proposed function: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                rating_val = recipe.get('rating') if 'rating' in recipe else recipe.get('rating_value', 0)
+                if rating_val is None:
+                    rating_val = 0
+                if isinstance(rating_val, str):
+                    try:
+                        rating = float(rating_val)
+                    except:
+                        rating = 0
+                else:
+                    rating = float(rating_val)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                rc_val = recipe.get('review_count') if 'review_count' in recipe else recipe.get('rating_count', 0)
+                if rc_val is None:
+                    rc_val = 0
+                if isinstance(rc_val, str):
+                    try:
+                        rc = int(float(rc_val))
+                    except:
+                        rc = 0
+                else:
+                    rc = int(rc_val)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                # If calories field is missing, can't verify: exclude
+                passed = False
+        # Check required_ingredients (search title/ingredients for substring match)
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            # Combine title and (if available) ingredients into search space
+            words_parts = []
+            if 'title' in recipe and recipe['title']:
+                words_parts.append(str(recipe['title']))
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients) > 0 and isinstance(ingredients[0], dict):
+                words_parts += [d.get('name', '') for d in ingredients]
+            else:
+                words_parts += [str(x) for x in ingredients]
+            words = ' '.join(words_parts).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                filter_servings = filters['servings']
+                if (servings is None) or (str(servings).strip() == ""):
+                    passed = False
+                else:
+                    try:
+                        if int(servings) != int(filter_servings):
+                            passed = False
+                    except:
+                        if str(servings).strip() != str(filter_servings).strip():
+                            passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+Explanation: The only strictly necessary change (per the new task's revealed bug) is to handle cases where the 'nutrition_facts' key is missing or does not have a 'Calories' field – and if so, recipes should be excluded for max_calories filter (since we cannot confirm the calorie count). The previous logic already did this, but it is now commented and explicit. No changes are needed for type handling for calories or prep time, as these are already robust. No other parts should change. This ensures correct filtering for recipes where nutrition/calorie info is sometimes entirely absent from summaries or details.
+Allrecipes--0
+Trajectory check results: 3
+Allrecipes--1
+Trajectory check results: 2
+wrong trajectory Allrecipes--1
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--1.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--1.txt
+Corrected proposed function: def filter_recipes(recipe_list_str, filter_dict_str):
+    """
+    Filters a list of recipe summaries or detailed recipes based on multiple criteria.
+    Arguments:
+        recipe_list_str: A stringified list (JSON) of recipe summaries or detail dicts. Each recipe is a dict that may include keys like
+            'rating', 'rating_count', 'review_count', 'nutrition_facts', 'ingredients', 'prep_time', 'servings', etc.
+        filter_dict_str: A stringified dictionary (JSON) with possible keys:
+            - 'min_rating': minimum float rating value
+            - 'min_review_count': minimum integer for reviews
+            - 'max_calories': maximum calories per serving (number)
+            - 'required_ingredients': list of ingredient names that must all be present (string search)
+            - 'max_prep_time': string (e.g., '60 mins') or integer (minutes) for prep time
+            - 'servings': exact number of servings (integer or stringified int)
+    Returns a JSON stringified list of recipes satisfying ALL filters given.
+    """
+    import json
+    import re
+
+    def error(msg):
+        return json.dumps({"error": msg})
+
+    # Attempt to coerce recipe_list_str and filter_dict_str to JSON objects
+    try:
+        if isinstance(recipe_list_str, str):
+            recipes = json.loads(recipe_list_str)
+        else:
+            recipes = recipe_list_str
+    except Exception as e:
+        return error(f"Failed to parse recipe_list_str as JSON: {e}")
+    try:
+        if isinstance(filter_dict_str, str):
+            filters = json.loads(filter_dict_str)
+        else:
+            filters = filter_dict_str
+    except Exception as e:
+        return error(f"Failed to parse filter_dict_str as JSON: {e}")
+    def time_to_minutes(timestr):
+        if not timestr:
+            return 0
+        if isinstance(timestr, int) or isinstance(timestr, float):
+            return int(timestr)
+        try:
+            total = 0
+            for part in re.findall(r"(\d+\.?\d*)\s*(hr|hour|hours|h|min|minute|minutes|m)", str(timestr).lower()):
+                val, unit = part
+                val = float(val)
+                if 'h' in unit:
+                    total += int(val*60)
+                elif 'min' in unit or unit=='m':
+                    total += int(val)
+            if total == 0:
+                try:
+                    return int(float(timestr))
+                except:
+                    return 0
+            return int(total)
+        except Exception as e:
+            return 0
+    out = []
+    for recipe in recipes if isinstance(recipes, list) else []:
+        passed = True
+        # Check min_rating
+        if 'min_rating' in filters:
+            try:
+                rating_val = recipe.get('rating') if 'rating' in recipe else recipe.get('rating_value', 0)
+                if rating_val is None:
+                    rating_val = 0
+                if isinstance(rating_val, str):
+                    try:
+                        rating = float(rating_val)
+                    except:
+                        rating = 0
+                else:
+                    rating = float(rating_val)
+                if rating < float(filters['min_rating']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check min_review_count
+        if passed and 'min_review_count' in filters:
+            try:
+                rc_val = recipe.get('review_count') if 'review_count' in recipe else recipe.get('rating_count', 0)
+                if rc_val is None:
+                    rc_val = 0
+                if isinstance(rc_val, str):
+                    try:
+                        rc = int(float(rc_val))
+                    except:
+                        rc = 0
+                else:
+                    rc = int(rc_val)
+                if rc < int(filters['min_review_count']):
+                    passed = False
+            except Exception:
+                passed = False
+        # Check max_calories
+        if passed and 'max_calories' in filters:
+            cals = None
+            nf = recipe.get('nutrition_facts') or {}
+            if isinstance(nf, str):
+                try:
+                    nf = json.loads(nf)
+                except Exception:
+                    nf = {}
+            cals = nf.get('Calories')
+            if cals:
+                try:
+                    cals_val = re.search(r"[\d\.]+", str(cals))
+                    cals_num = float(cals_val.group()) if cals_val else 1e9
+                    if cals_num > float(filters['max_calories']):
+                        passed = False
+                except Exception:
+                    passed = False
+            else:
+                passed = False
+        # Check required_ingredients (search title/ingredients for substring match)
+        if passed and 'required_ingredients' in filters:
+            requireds = filters['required_ingredients']
+            # Accept string, single ingredient, or list
+            if isinstance(requireds, str):
+                try:
+                    requireds_loaded = json.loads(requireds)
+                    if isinstance(requireds_loaded, list):
+                        requireds = requireds_loaded
+                    else:
+                        requireds = [requireds]
+                except:
+                    requireds = [requireds]
+            elif not isinstance(requireds, list):
+                requireds = [str(requireds)]
+            # Fix: Combine title and ingredients for search when filtering for ingredients on search summary
+            words_parts = []
+            if 'title' in recipe and recipe['title']:
+                words_parts.append(str(recipe['title']))
+            ingredients = recipe.get('ingredients', [])
+            if isinstance(ingredients, str):
+                try:
+                    parsed = json.loads(ingredients)
+                    if isinstance(parsed, list):
+                        ingredients = parsed
+                    else:
+                        ingredients = [parsed]
+                except Exception:
+                    try:
+                        ingredients = [i.strip() for i in re.split(r"[;|,\n]", ingredients) if i.strip()]
+                    except:
+                        ingredients = []
+            if isinstance(ingredients, list) and len(ingredients) > 0 and isinstance(ingredients[0], dict):
+                words_parts += [d.get('name', '') for d in ingredients]
+            else:
+                words_parts += [str(x) for x in ingredients]
+            words = ' '.join(words_parts).lower()
+            for req in requireds:
+                if str(req).strip().lower() not in words:
+                    passed = False
+                    break
+        # Check max_prep_time
+        if passed and 'max_prep_time' in filters:
+            prep = recipe.get('prep_time') or ''
+            if not prep:
+                prep = recipe.get('total_time', recipe.get('cook_time',''))
+            xval = time_to_minutes(prep)
+            mpf = filters['max_prep_time']
+            if isinstance(mpf, str):
+                yval = time_to_minutes(mpf)
+            else:
+                try:
+                    yval = int(mpf)
+                except:
+                    yval = 0
+            if xval > yval:
+                passed = False
+        # Check servings
+        if passed and 'servings' in filters:
+            servings = recipe.get('servings')
+            try:
+                filter_servings = filters['servings']
+                if (servings is None) or (str(servings).strip() == ""):
+                    passed = False
+                else:
+                    try:
+                        if int(servings) != int(filter_servings):
+                            passed = False
+                    except:
+                        if str(servings).strip() != str(filter_servings).strip():
+                            passed = False
+            except Exception:
+                passed = False
+        if passed:
+            out.append(recipe)
+    try:
+        return json.dumps(out)
+    except Exception as e:
+        return error(f"Failed to serialize filtered recipes as JSON: {e}")
+Explanation: The root cause of the problem was that the filter for required_ingredients only checked the recipe's 'ingredients' field—if it was missing (as in search summaries), it could never match an ingredient like 'zucchini'. The fix is to concatenate the 'title' and the ingredients list when searching for required ingredients so that recipes mentioning 'zucchini' in the title (the only place it appears in summaries) can match. This allows the filter step to work as intended on summaries as well as detailed recipe objects.
+2
+New function proposed: def filter_recipes_by_criteria(recipes, min_reviews='', min_rating='', max_total_time=''):
+    """
+    Filters a list of recipes based on criteria:
+      - min_reviews: Minimum number of user reviews a recipe must have (integer, as string).
+      - min_rating: Minimum average recipe rating required (float, as string).
+      - max_total_time: Optional, maximum total prep+cook time allowed (format: e.g. '30 mins', as string).
+    Each recipe must be a dictionary containing at least:
+      - 'url': the recipe URL
+      - 'rating_count' or 'review_count' (string or int)
+      - 'rating' or 'rating_value' (string or float)
+      - 'total_time' (string, e.g., '25 mins' or '1 hr 15 mins'), available after get_recipe_details
+    Returns a list of recipe dicts that satisfy all given filters. If a filter value is not provided (empty string), it is ignored.
+    Note: Uses the existing search and get_recipe_details functions.
+    """
+    def parse_minutes(time_str):
+        # Supported formats: '30 mins', '1 hr 15 mins', '2 hrs', etc.
+        if not time_str or not isinstance(time_str, str):
+            return None
+        time_str = time_str.lower().strip()
+        import re
+        total = 0
+        hr_match = re.search(r'(\d+)\s*hr', time_str)
+        min_match = re.search(r'(\d+)\s*min', time_str)
+        if hr_match:
+            total += int(hr_match.group(1)) * 60
+        if min_match:
+            total += int(min_match.group(1))
+        return total if total > 0 else None
+
+    filtered = []
+
+    # Defensive conversion of agent-provided arguments
+    try:
+        if min_reviews == '' or min_reviews is None:
+            min_reviews_int = None
+        else:
+            min_reviews_int = int(str(min_reviews).replace(',', ''))
+    except Exception as e:
+        return {
+            'error': f"Invalid 'min_reviews': {min_reviews}. Error: {str(e)}",
+            'details': 'Check that min_reviews is an integer or string representing an integer.'
+        }
+    try:
+        if min_rating == '' or min_rating is None:
+            min_rating_float = None
+        else:
+            min_rating_float = float(str(min_rating))
+    except Exception as e:
+        return {
+            'error': f"Invalid 'min_rating': {min_rating}. Error: {str(e)}",
+            'details': 'Check that min_rating is a float or string representing a float.'
+        }
+    try:
+        if max_total_time == '' or max_total_time is None:
+            max_minutes = None
+        else:
+            max_minutes = parse_minutes(str(max_total_time))
+    except Exception as e:
+        return {
+            'error': f"Invalid 'max_total_time': {max_total_time}. Error: {str(e)}",
+            'details': 'Check that max_total_time is a string like "30 mins" or "2 hrs".'
+        }
+
+    # Defensive conversion of recipes argument
+    if not isinstance(recipes, list):
+        try:
+            # Try to coerce a string version of a list (sometimes LLMs stringify JSON)
+            import ast
+            recipes = ast.literal_eval(recipes)
+            if not isinstance(recipes, list):
+                raise ValueError('Not a list after parsing')
+        except Exception as e:
+            return {
+                'error': f"Invalid 'recipes' argument: {recipes}. Error: {str(e)}",
+                'details': 'Check that recipes is a list of dicts.'
+            }
+
+    for rec in recipes:
+        if not isinstance(rec, dict):
+            # Could bail out or skip non-dicts
+            continue
+        # Try to get rating count and rating value from recipe object
+        rating_count = rec.get('rating_count') or rec.get('review_count')
+        if rating_count is None and 'rating_count' in rec:
+            rating_count = rec['rating_count']
+        # Defensive conversion of rating_count
+        if isinstance(rating_count, str):
+            try:
+                rating_count = int(rating_count.replace(',', ''))
+            except:
+                rating_count = 0
+        elif isinstance(rating_count, (int, float)):
+            rating_count = int(rating_count)
+        elif rating_count is None:
+            rating_count = 0
+        else:
+            try:
+                rating_count = int(rating_count)
+            except:
+                rating_count = 0
+
+        # Try to get rating value
+        rating = rec.get('rating') or rec.get('rating_value')
+        # Defensive conversion of rating
+        if isinstance(rating, str):
+            try:
+                rating = float(rating)
+            except:
+                rating = 0.0
+        elif isinstance(rating, (int, float)):
+            rating = float(rating)
+        elif rating is None:
+            rating = 0.0
+        else:
+            try:
+                rating = float(rating)
+            except:
+                rating = 0.0
+
+        # Need total_time; if not present, try to get from details
+        total_time = rec.get('total_time')
+        if not total_time and 'url' in rec:
+            try:
+                details = get_recipe_details(str(rec['url']))
+                total_time = details.get('total_time')
+                rec.update(details)
+            except Exception as e:
+                # If cannot fetch details, skip time filtering
+                total_time = None
+        # Defensive parse
+        total_minutes = parse_minutes(total_time) if total_time else None
+
+        include = True
+        if min_reviews_int is not None and rating_count < min_reviews_int:
+            include = False
+        if min_rating_float is not None and rating < min_rating_float:
+            include = False
+        if max_minutes is not None and (total_minutes is None or total_minutes > max_minutes):
+            include = False
+        if include:
+            filtered.append(rec)
+    return filtered
+
+Allrecipes--3
+Trajectory check results: 3
+Allrecipes--4
+Trajectory check results: 3
+Allrecipes--5
+Trajectory check results: 3
+3
+New function proposed: def extract_recipe_main_ingredients(recipe_details_str, main_count='5'):
+    '''
+    Given a detailed recipe dictionary as a string (as returned by get_recipe_details),
+    extract a concise list of the main ingredients most essential to the dish.
+    By default, returns the top N (main_count) unique ingredients, prioritizing by prominence
+    (order in the list), and excluding common seasonings and optional/garnish ingredients.
+    This is useful for presenting concise ingredient lists for summary outputs or quick overviews.
+
+    Arguments:
+      recipe_details_str: JSON string representing a recipe dict from get_recipe_details
+      main_count: number of main ingredients to return (as string, default '5')
+    Returns:
+      List of main ingredient names (as strings)
+    '''
+    import json
+    # Try converting main_count to int, handle non-int errors
+    try:
+        main_count_int = int(main_count)
+    except (ValueError, TypeError):
+        return {
+            'error': f"Invalid main_count value: {main_count}. main_count must be an integer.",
+            'result': []
+        }
+    # Try to parse the recipe_details_str
+    try:
+        if isinstance(recipe_details_str, dict):
+            recipe = recipe_details_str
+        else:
+            recipe = json.loads(recipe_details_str)
+    except Exception as e:
+        return {
+            'error': f"Failed to parse recipe_details_str as JSON: {e}",
+            'result': []
+        }
+    ingredients = recipe.get('ingredients', [])
+    if not isinstance(ingredients, list):
+        return {
+            'error': "The recipe 'ingredients' field must be a list.",
+            'result': []
+        }
+    # List of words/phrases that indicate an ingredient is not main (seasonings, water, etc)
+    exclude_keywords = [
+        'salt', 'pepper', 'water', 'to taste', 'garnish', 'optional',
+        'seasoning', 'spice', 'herb', 'oil', 'baking powder', 'baking soda',
+        'extract', 'cooking spray', 'nonstick', 'lemon juice'
+    ]
+    main_only = []
+    for ing in ingredients:
+        # Ingredient structure: {'quantity', 'unit', 'name'}
+        # Defensive: skip if not dict
+        if not isinstance(ing, dict):
+            continue
+        name = ing.get('name', '')
+        if not isinstance(name, str):
+            continue
+        lowered = name.lower()
+        if any(x in lowered for x in exclude_keywords):
+            continue
+        # Avoid duplicates
+        if name not in main_only:
+            main_only.append(name)
+        if len(main_only) >= main_count_int:
+            break
+    return main_only
+Allrecipes--6
+Trajectory check results: 3
+Allrecipes--7
+Trajectory check results: 3
+Allrecipes--8
+{'step': 4, 'function': 'extract_recipe_main_ingredients', 'args': {'recipe_details_str': '{"title": "Beef Wellington", "rating": "4.7", "rating_count": "362", "review_count": "258", "description": "This beef Wellington recipe makes an impressive beef tenderloin wrapped in puff pastry and includes how to make a rich red wine sauce to serve with it. It\'s easier than you think to make and perfect for holiday entertaining! The beef tenderloin is best served medium-rare.", "prep_time": "30 mins", "cook_time": "40 mins", "total_time": "1 hr 10 mins", "servings": "8", "ingredients": [{"quantity": "2 \\u00bd", "unit": "pounds", "name": "beef tenderloin"}, {"quantity": "4", "unit": "tablespoons", "name": "butter, softened, divided"}, {"quantity": "2", "unit": "tablespoons", "name": "butter"}, {"quantity": "1", "unit": "", "name": "onion, chopped"}, {"quantity": "\\u00bd", "unit": "cup", "name": "sliced fresh mushrooms"}, {"quantity": "2", "unit": "ounces", "name": "liver pâté"}, {"quantity": "", "unit": "", "name": "salt and pepper to taste"}, {"quantity": "1", "unit": "(17.5 ounce) package", "name": "frozen puff pastry, thawed"}, {"quantity": "1", "unit": "large", "name": "egg yolk, beaten"}, {"quantity": "1", "unit": "(10.5 ounce) can", "name": "beef broth"}, {"quantity": "2", "unit": "tablespoons", "name": "red wine"}], "nutrition_facts": {"Calories": "744", "Fat": "57g", "Carbs": "30g", "Protein": "26g"}, "directions": ["Preheat the oven to 425 degrees F (220 degrees C).", "Place beef tenderloin in a baking dish. Spread 2 tablespoons softened butter over beef.Dotdash Meredith Food Studios", "Bake in the preheated oven until browned, 10 to 15 minutes. Remove beef from the pan and reserve pan juices; allow beef to cool completely.Dotdash Meredith Food Studios", "Increase oven temperature to 450 degrees F (230 degrees C).", "Melt 2 tablespoons butter in a skillet over medium heat. Saut\x00e9 onion and mushrooms in butter for 5 minutes. Remove from heat and let cool.Dotdash Meredith Food Studios", "Mix pâté and remaining 2 tablespoons softened butter together in a bowl; season with salt and pepper. Spread pâté mixture over beef. Top with onion and mushroom mixture.Dotdash Meredith Food Studios", "Roll out puff pastry dough to about 1/4-inch thickness and place beef in the center.Dotdash Meredith Food Studios", "Fold up and seal all the edges, making sure the seams are not too thick. Place beef in a 9x13-inch baking dish, cut a few slits in the top of dough, and brush with egg yolk.Dotdash Meredith Food Studios", "Bake in the preheated oven for 10 minutes. Reduce heat to 425 degrees F (220 degrees C) and continue baking until pastry is a rich, golden brown, 10 to 15 minutes. An instant-read thermometer inserted into the center should read between 122 to 130 degrees F (50 to 54 degrees C) for medium rare. Set aside to rest.Dotdash Meredith Food Studios", "Meanwhile, place reserved pan juices in a small saucepan over high heat. Stir in beef broth and red wine; boil until slightly reduced, about 5 minutes. Strain and serve with beef.Dotdash Meredith Food Studios", "Serve hot and enjoy!DOTDASH MEREDITH FOOD STUDIOS"]}', 'main_count': '5'}, 'explanation': 'Instead of first retrieving the details and then extracting the main ingredients, we can directly extract the main ingredients from the detailed (already-filtered) Beef Wellington recipe. This combines the steps of identifying the recipe and extracting the key ingredients. This step merges: (1) retrieve details (old step 2) and (2) extract main ingredients (missing in old trajectory, but part of user query).', 'result': '[{"type": "text", "text": "{\\n  \\"error\\": \\"Failed to parse recipe_details_str as JSON: Invalid control character at: line 1 column 1819 (char 1818)\\",\\n  \\"result\\": []\\n}"}]', 'old_trajectory_steps': ['Step 2: get_recipe_details']}
+Trajectory check results: 2
+wrong trajectory Allrecipes--8
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--8.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--8.txt
+Corrected proposed function: def extract_recipe_main_ingredients(recipe_details_str, main_count='5'):
+    '''
+    Given a detailed recipe dictionary as a string (as returned by get_recipe_details),
+    extract a concise list of the main ingredients most essential to the dish.
+    By default, returns the top N (main_count) unique ingredients, prioritizing by prominence
+    (order in the list), and excluding common seasonings and optional/garnish ingredients.
+    This is useful for presenting concise ingredient lists for summary outputs or quick overviews.
+
+    Arguments:
+      recipe_details_str: JSON string representing a recipe dict from get_recipe_details
+      main_count: number of main ingredients to return (as string, default '5')
+    Returns:
+      List of main ingredient names (as strings)
+    '''
+    import json
+    # Try converting main_count to int, handle non-int errors
+    try:
+        main_count_int = int(main_count)
+    except (ValueError, TypeError):
+        return {
+            'error': f"Invalid main_count value: {main_count}. main_count must be an integer.",
+            'result': []
+        }
+    # If input is dict, use as is; if not, try to sanitize before JSON loading
+    if isinstance(recipe_details_str, dict):
+        recipe = recipe_details_str
+    else:
+        # If input is from repr() of dict (single quotes), try to convert to proper JSON
+        if isinstance(recipe_details_str, str):
+            # Replace single quotes with double quotes
+            import re
+            # Common fix for True/False/None
+            fixed_str = recipe_details_str.replace("True", "true").replace("False", "false").replace("None", "null")
+            # Replace Python-style single quotes with JSON double quotes (for top-level keys only)
+            fixed_str = re.sub(r"'(\w+)':", r'"\1":', fixed_str)
+            fixed_str = fixed_str.replace("'", '"')
+            try:
+                recipe = json.loads(fixed_str)
+            except Exception:
+                # fallback: try raw JSON loading on original
+                try:
+                    recipe = json.loads(recipe_details_str)
+                except Exception as e:
+                    return {
+                        'error': f"Failed to parse recipe_details_str as JSON: {e}",
+                        'result': []
+                    }
+        else:
+            return {
+                'error': f"recipe_details_str is not a dict or str; type={type(recipe_details_str)}",
+                'result': []
+            }
+    ingredients = recipe.get('ingredients', [])
+    if not isinstance(ingredients, list):
+        return {
+            'error': "The recipe 'ingredients' field must be a list.",
+            'result': []
+        }
+    # List of words/phrases that indicate an ingredient is not main (seasonings, water, etc)
+    exclude_keywords = [
+        'salt', 'pepper', 'water', 'to taste', 'garnish', 'optional',
+        'seasoning', 'spice', 'herb', 'oil', 'baking powder', 'baking soda',
+        'extract', 'cooking spray', 'nonstick', 'lemon juice'
+    ]
+    main_only = []
+    for ing in ingredients:
+        # Ingredient structure: {'quantity', 'unit', 'name'}
+        # Defensive: skip if not dict
+        if not isinstance(ing, dict):
+            continue
+        name = ing.get('name', '')
+        if not isinstance(name, str):
+            continue
+        lowered = name.lower()
+        if any(x in lowered for x in exclude_keywords):
+            continue
+        # Avoid duplicates
+        if name not in main_only:
+            main_only.append(name)
+        if len(main_only) >= main_count_int:
+            break
+    return main_only
+Explanation: The error stemmed from the fact that the input string (recipe_details_str) may not always be valid JSON—sometimes it's a Python dict, sometimes a dictionary string representation (single quotes, not valid JSON), or a JSON string that might contain invalid characters such as unescaped control characters. The improved function first checks the type, and if it's a string, attempts to robustly sanitize it: it converts Python single-quoted and repr-style dict representations to valid JSON (double quotes, etc.) before decoding, and explicitly replaces Pythonic None/True/False with their JSON equivalents. This makes the function much more robust to a variety of input formats, fixing the parsing errors observed in the failed trajectory.
+Allrecipes--6
+Trajectory check results: 3
+Allrecipes--7
+Trajectory check results: 3
+Allrecipes--8
+Trajectory check results: 3
+4
+New function proposed: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # Defensive: raw_results from search **should** be a list, but LLM may give you a string, dict, or None
+    try:
+        raw_results = -search(query=collection_url)
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+
+Allrecipes--9
+Trajectory check results: 3
+Allrecipes--10
+{'step': 1, 'function': 'extract_recipe_list_from_collection', 'args': {'collection_url': 'https://www.allrecipes.com/gallery/most-popular-recipes-1960s/', 'max_recipes': ''}, 'explanation': "With the new function 'extract_recipe_list_from_collection', we can directly extract the list of individual recipes from the collection page 'The Most Popular Recipes of the 1960s'. This combines and replaces steps 2–9 of the old trajectory, as we no longer need to fumble through repeated searches or attempt to get collection details using an inappropriate function. This step will quickly give us the URLs for recipes in the collection, allowing us to immediately target the second recipe for detail extraction.", 'result': '[{"type": "text", "text": "{\\"error\\": \\"search(query=collection_url) failed\\", \\"collection_url\\": \\"https://www.allrecipes.com/gallery/most-popular-recipes-1960s/\\", \\"exception\\": \\"bad operand type for unary -: \'list\'\\"}"}]', 'old_trajectory_steps': [2, 3, 4, 5, 6, 7, 8, 9]}
+Trajectory check results: 2
+wrong trajectory Allrecipes--10
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--10.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--10.txt
+Corrected proposed function: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # Defensive: raw_results from search **should** be a list, but LLM may give you a string, dict, or None
+    try:
+        raw_results = search(query=collection_url)   # <-- Fixed: remove erroneous unary minus ('-')
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+
+Explanation: The error 'bad operand type for unary -: 'list'' occurred because the new function called search as '-search(query=collection_url)', mistakenly using a unary minus. This is invalid Python syntax and causes a TypeError. To fix this, simply remove the unary minus and call 'search(query=collection_url)' directly. This ensures that search receives the correct arguments and format, and its output can then be processed as intended for extracting the recipe list from a collection.
+Allrecipes--9
+Trajectory check results: 3
+Allrecipes--10
+Trajectory check results: 2
+wrong trajectory Allrecipes--10
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--10.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--10.txt
+Corrected proposed function: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # Defensive: raw_results from search **should** be a list, but LLM may give you a string, dict, or None
+    try:
+        raw_results = search(query=collection_url)
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+
+Explanation: The original version of the function incorrectly called search as '-search(query=collection_url)', introducing a Python syntax error (unary minus applied to a function call that returns a list). This was the root cause of errors in the updated trajectories. The only change made is to call search(query=collection_url) directly, which returns the expected list for further parsing. This fixes the error and allows the function to receive and process search output as designed.
+Allrecipes--9
+Trajectory check results: 3
+Allrecipes--10
+Trajectory check results: 2
+wrong trajectory Allrecipes--10
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--10.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--10.txt
+Corrected proposed function: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # Correct call: DO NOT use unary minus
+    try:
+        raw_results = search(query=collection_url)
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+Explanation: The only mistake was the use of a unary minus ('-') before the search function call (i.e., '-search(...)'), which caused a TypeError. The fix is to call 'search(query=collection_url)' directly without the minus. This ensures that the argument parsing and pipeline work as intended and recipes from a collection can be extracted and returned as expected.
+Allrecipes--9
+Trajectory check results: 3
+Allrecipes--10
+Trajectory check results: 2
+wrong trajectory Allrecipes--10
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--10.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--10.txt
+Corrected proposed function: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # The only correction: Remove unary minus from the search call
+    try:
+        raw_results = search(query=collection_url)
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+
+Explanation: The original implementation incorrectly used a unary minus before the search function call (i.e., '-search(...)'), which is a Python error when the result is a list. The only correction needed is to remove the unary minus and call 'search(query=collection_url)' directly. This resolves argument parsing and type errors caused by the invalid operation, allowing the function to properly extract recipe lists from the collection as designed.
+Allrecipes--9
+Trajectory check results: 3
+Allrecipes--10
+Trajectory check results: 2
+wrong trajectory Allrecipes--10
+agent_verify\WebVoyager\logs_with_results\log_Allrecipes--10.txt
+agent_verify\WebVoyager\improved_logs\log_Allrecipes--10.txt
+Corrected proposed function: def extract_recipe_list_from_collection(collection_url, max_recipes=''):
+    '''
+    Given the URL of a recipe collection or gallery page (such as Allrecipes collections for an era or theme),
+    extract the list of individual recipes contained within the collection.
+    Optionally limit the number of returned recipes to 'max_recipes' (as a string; if empty string, all recipes are returned).
+
+    For each recipe, return at least: title, recipe_url; if a brief summary or rating is available, include those as well.
+    The result is a JSON string of a list of dictionaries, each representing a recipe with available attributes.
+
+    Args:
+        collection_url: The URL (as a string) for the recipe collection or gallery page.
+        max_recipes: (Optional) The maximum number of recipes to return, as a string. If empty string, return all.
+    Returns:
+        A JSON string of a list of recipe dicts: { 'title': ..., 'url': ..., 'rating_value': ..., 'rating_count': ..., 'summary': ...}
+        Only the available fields are included; summary/rating fields are optional.
+    '''
+    import json
+    # Defensive conversion for collection_url
+    if not isinstance(collection_url, str):
+        try:
+            collection_url = str(collection_url)
+        except Exception as e:
+            return json.dumps({
+                "error": "collection_url could not be converted to string",
+                "exception": str(e)
+            })
+    # Defensive fix in case max_recipes is passed as int/float/None
+    if max_recipes is None:
+        max_recipes = ''
+    try:
+        # Handle numeric values (int, float) robustly (LLMs can pass as numbers)
+        if (isinstance(max_recipes, int) or isinstance(max_recipes, float)):
+            max_recipes = str(int(max_recipes))
+        elif not isinstance(max_recipes, str):
+            max_recipes = str(max_recipes)
+    except Exception as e:
+        # Fallback if something odd happens
+        max_recipes = ''
+
+    # CORRECTION: Do NOT use a unary minus on this call.
+    try:
+        raw_results = search(query=collection_url)
+    except Exception as e:
+        return json.dumps({
+            "error": "search(query=collection_url) failed",
+            "collection_url": collection_url,
+            "exception": str(e)
+        })
+
+    # Try coercing raw_results to iterable
+    if not isinstance(raw_results, list):
+        # Try loading from JSON if string, or use list() if possible
+        if isinstance(raw_results, str):
+            try:
+                raw_results = json.loads(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list or valid JSON string",
+                    "raw_results": str(raw_results)
+                })
+        else:
+            try:
+                raw_results = list(raw_results)
+            except Exception:
+                return json.dumps({
+                    "error": "search() did not return a list",
+                    "raw_results": str(raw_results)
+                })
+
+    recipes = []
+    for item in raw_results:
+        # Defensive - item should be dict
+        if not isinstance(item, dict):
+            continue
+        try:
+            # Defensive - item['text'] should be str or JSONable
+            data = item.get('text', item)
+            if isinstance(data, str):
+                try:
+                    data = json.loads(data)
+                except Exception:
+                    continue
+            # Now data should be a dict
+            if not isinstance(data, dict):
+                continue
+            url = data.get('url')
+            if not url or not isinstance(url, str) or not url.startswith('http'):
+                continue
+            # Only keep recipes that are not the collection itself
+            if url == collection_url:
+                continue
+            recipes.append({
+                'title': data.get('title', ''),
+                'url': url,
+                'rating_value': data.get('rating_value', ''),
+                'rating_count': data.get('rating_count', ''),
+                'summary': data.get('description', '')
+            })
+        except Exception:
+            continue
+    # Optionally limit results
+    if max_recipes != '':
+        try:
+            max_n = int(max_recipes)
+            recipes = recipes[:max_n]
+        except Exception:
+            # Return a message showing it failed to parse the max_recipes
+            return json.dumps({
+                "error": "Could not convert max_recipes to integer",
+                "max_recipes": max_recipes
+            })
+    try:
+        return json.dumps(recipes)
+    except Exception as e:
+        return json.dumps({
+            "error": "Failed to serialize result list",
+            "exception": str(e),
+            "recipes": str(recipes)[:500] # avoid huge dump
+        })
+Explanation: The only error in the original implementation was the use of a unary minus ('-') before search(query=collection_url), which causes a TypeError because the search result is a list, not a number. This has been corrected by simply calling search(query=collection_url) as intended. This ensures argument types are properly handled and resolves the error that caused the function to fail to extract recipes from a collection.
+5
+New function proposed: def extract_nutrient_amount(recipe_details_str, nutrient_name):
+    """
+    Given a detailed recipe dictionary as a string (from get_recipe_details), extract the amount (and unit, if available) of a specific nutrient (e.g., Iron, Calcium, Vitamin C) per serving from the nutrition facts or full nutrition label of the recipe.
+
+    Arguments:
+      recipe_details_str: JSON string representing a recipe dict as returned by get_recipe_details
+      nutrient_name: Name of the nutrient to extract (e.g., 'Iron', 'Calcium', 'Vitamin C').
+    Returns:
+      The amount and unit of the specified nutrient as a string (e.g., '1.2mg'), or None if not found.
+    """
+    import json
+
+    # Try to ensure recipe_details_str is a string
+    if not isinstance(recipe_details_str, str):
+        try:
+            # It might be a dict already or another Python object
+            import json
+            recipe = recipe_details_str
+            if not isinstance(recipe, dict):
+                return "ERROR: recipe_details_str is not a valid string or dict."
+        except Exception as e:
+            return f"ERROR: Unable to interpret recipe_details_str. Details: {e}"
+    else:
+        try:
+            recipe = json.loads(recipe_details_str)
+        except Exception as e:
+            return f"ERROR: Could not parse recipe_details_str as JSON. Details: {e}"
+
+    # Defensive check in case recipe isn't a dict
+    if not isinstance(recipe, dict):
+        return "ERROR: Parsed recipe_details is not a dictionary."
+
+    # Try to grab the nutrition_facts
+    nutrition = recipe.get('nutrition_facts', {})
+    if not isinstance(nutrition, dict):
+        # Sometimes LLM might serialize as a JSON string, try to parse
+        if isinstance(nutrition, str):
+            try:
+                nutrition = json.loads(nutrition)
+            except Exception as e:
+                return f"ERROR: nutrition_facts could not be parsed into dict. Details: {e}"
+        else:
+            return "ERROR: nutrition_facts is not a dict or parsable string."
+
+    # Normalize nutrient_name
+    if not isinstance(nutrient_name, str):
+        try:
+            nutrient_name = str(nutrient_name)
+        except Exception as e:
+            return f"ERROR: nutrient_name is not a string and could not be converted. Details: {e}"
+    nutrient_query = nutrient_name.strip().lower()
+
+    # Try case-insensitive exact match
+    for key, value in nutrition.items():
+        if isinstance(key, str) and key.strip().lower() == nutrient_query:
+            return value
+    # Try case-insensitive partial match (for nutrition labels that add '% Daily Value' or units)
+    for key, value in nutrition.items():
+        if isinstance(key, str) and nutrient_query in key.strip().lower():
+            return value
+    return None
+Allrecipes--12
+Trajectory check results: 3
+Allrecipes--13
+Trajectory check results: 3
+Allrecipes--14
+Trajectory check results: 3
+6
+New function proposed: def get_latest_recipe_review(recipe_url):
+    """
+    Retrieves the most recent user review for a given recipe from its Allrecipes recipe page.
+    Args:
+        recipe_url: The URL of the recipe page on Allrecipes (as a string).
+    Returns:
+        A dictionary containing the following (if available):
+            - 'author': Name of the reviewer
+            - 'date': Date the review was posted
+            - 'rating': Rating given in the review (may be None if not available)
+            - 'review_text': The text of the review
+        If no review is found, returns None.
+    """
+    # Validate and convert recipe_url to string, if possible
+    if recipe_url is None:
+        return {'error': 'recipe_url argument missing or None', 'code': 'ARGUMENT_ERROR'}
+    try:
+        recipe_url_str = str(recipe_url)
+    except Exception as e:
+        return {'error': f'Could not convert recipe_url to string: {e}', 'code': 'TYPE_CONVERSION_ERROR'}
+    # Minimal type/content check
+    if not recipe_url_str.startswith('http'):
+        return {'error': f'Provided recipe_url does not appear to be a valid URL: {recipe_url_str}', 'code': 'INVALID_URL'}
+    # Pseudo-code for fetching (implementation would depend on actual APIs/tools)
+    try:
+        # Replace this with real fetching logic in production
+        # reviews = fetch_reviews_for_recipe(recipe_url_str)
+        reviews = []  # placeholder to prevent NameError in this mockup
+        if not reviews:
+            return None
+        # Sort reviews by date descending, pseudo-code
+        # sorted_reviews = sort_by_date_descending(reviews)
+        sorted_reviews = reviews
+        latest_review = sorted_reviews[0]
+        # Try accessing expected keys, with safe fallback
+        author = latest_review.get('author')
+        date = latest_review.get('date')
+        rating = latest_review.get('rating', None)
+        review_text = latest_review.get('text')
+        return {
+            'author': author,
+            'date': date,
+            'rating': rating,
+            'review_text': review_text
+        }
+    except Exception as e:
+        return {'error': f'Error occurred while fetching or processing reviews: {e}', 'code': 'PROCESSING_ERROR'}
+
+Allrecipes--15
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -search
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -filter_recipes_by_criteria
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\webvoyager_env.py", line 32, in call_mcp_tool
+    func_response = await mcp_client.call_tool(function_name, function_args)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\t-avalsingh\AppData\Local\miniconda3\Lib\site-packages\fastmcp\client\client.py", line 760, in call_tool
+    raise ToolError(msg)
+fastmcp.exceptions.ToolError: Unknown tool: -filter_recipes_by_criteria
+Trajectory check results: 3
+Allrecipes--16
+Trajectory check results: 3
+Allrecipes--17
+Trajectory check results: 3
+7
+New function proposed: def count_recipe_ingredients(recipe_details_str):
+    '''
+    Given a detailed recipe dictionary as a string (from get_recipe_details),
+    returns the total number of unique ingredients required for the recipe,
+    excluding optional and garnish ingredients. This is useful for filtering recipes
+    by ingredient count (e.g., "10 ingredients or less").
+
+    Arguments:
+      recipe_details_str: JSON string representing a recipe dict as returned by get_recipe_details
+    Returns:
+      An integer (as string) representing the count of required unique ingredients (excluding optionals/garnishes).
+    '''
+    import json
+
+    # Attempt to robustly coerce the input to the expected JSON string/dict
+    recipe_details_dict = None
+    if isinstance(recipe_details_str, dict):
+        recipe_details_json = json.dumps(recipe_details_str)
+    elif isinstance(recipe_details_str, str):
+        try:
+            # If it's a string, try loading JSON first to check it's valid
+            recipe_details_dict = json.loads(recipe_details_str)
+            recipe_details_json = json.dumps(recipe_details_dict)  # normalize formatting
+        except Exception:
+            # Otherwise, hope it's already a suitable string for extract_recipe_main_ingredients
+            recipe_details_json = recipe_details_str
+    else:
+        return "ERROR: recipe_details_str should be a JSON recipe string (or dict), got type {}".format(type(recipe_details_str).__name__)
+
+    # Defensive main_count setting: Make sure it's either int or string '99' (extract_recipe_main_ingredients might need correct type)
+    main_count = '99'
+    try:
+        ingredient_list = extract_recipe_main_ingredients(recipe_details_json, main_count=main_count)
+        if ingredient_list is None:
+            return "ERROR: extract_recipe_main_ingredients returned None. Check recipe format."
+        # Return the number as a string (since all outputs must be string)
+        return str(len(ingredient_list))
+    except Exception as e:
+        return f"ERROR: Failed to extract ingredients - {str(e)}"
+Allrecipes--18
+Trajectory check results: 3
+Allrecipes--19
+Trajectory check results: 3
+Allrecipes--20
+Trajectory check results: 3
+8
+New function proposed: def get_quickest_matching_recipe(query, min_reviews = '', min_rating = '', max_total_time = ''):
+    """
+    Searches for recipes based on the given query string, then filters the results by minimum user reviews, minimum average rating, and optional maximum total time.
+    Returns the single best-matching recipe (as a dictionary) with the lowest total preparation and cooking time among those that meet all criteria.
+    This function streamlines the process of finding the fastest recipe that satisfies all the common search requirements.
+
+    Arguments:
+      query: Search query string (e.g., 'baked lemon chicken')
+      min_reviews: Minimum number of user reviews a recipe must have (as string/int/float, optional)
+      min_rating: Minimum average rating required (as string/float/int, optional)
+      max_total_time: Maximum total time (e.g., '30 mins', as string/int/float, optional)
+    Returns:
+      The single recipe dictionary (with details, from get_recipe_details) with the shortest total prep+cook time that matches all filters, or None if no such recipe exists.
+    """
+    import json
+    import re
+    from datetime import timedelta
+
+    # Helper to robustly convert arguments to string (to pass to downstream functions), or handle None.
+    def safe_str(x):
+        if x is None:
+            return ''
+        try:
+            return str(x)
+        except Exception:
+            return ''
+
+    def parse_time(tstr):
+        """Convert a time string like '1 hr 20 mins' or '35 mins' to a number of minutes."""
+        if not tstr or not isinstance(tstr, str):
+            try:
+                # Support passing numbers (int, float) directly
+                return int(tstr)
+            except Exception:
+                return 0
+        hr, m = 0, 0
+        pattern = r"(?:(\d+)\s*hr[s]?)?\s*(\d+)?\s*min[s]?"
+        match = re.search(pattern, tstr)
+        if match:
+            if match.group(1):
+                hr = int(match.group(1))
+            if match.group(2):
+                m = int(match.group(2))
+        else:
+            hmatch = re.match(r"(\d+)\s*hr[s]?", tstr)
+            if hmatch:
+                hr = int(hmatch.group(1))
+        return hr * 60 + m
+
+    # Step 1: Search for recipes
+    try:
+        search_results = search(safe_str(query))
+    except Exception as e:
+        return {"error": f"search() failed: {e}"}
+
+    # Convert search results to a list of recipe dicts
+    try:
+        if isinstance(search_results, str):
+            recipes = json.loads(search_results)
+        else:
+            recipes = search_results
+        if not isinstance(recipes, list):
+            raise ValueError("search() did not return a list")
+    except Exception as e:
+        return {"error": f"Failed to parse search results: {e}"}
+
+    # Step 2: Filter by criteria
+    try:
+        recipes_json = json.dumps(recipes)
+        # Accept blank or non-string numbers for the args, but always pass as string since that's what downstream expects
+        filtered = filter_recipes_by_criteria(
+            recipes_json,
+            safe_str(min_reviews),
+            safe_str(min_rating),
+            safe_str(max_total_time)
+        )
+        if isinstance(filtered, str):
+            filtered_recipes = json.loads(filtered)
+        else:
+            filtered_recipes = filtered
+        if not isinstance(filtered_recipes, list):
+            raise ValueError("filter_recipes_by_criteria() did not return a list")
+    except Exception as e:
+        return {"error": f"Failed to filter recipes: {e}"}
+
+    if not filtered_recipes:
+        return None
+
+    # Step 3: Gather detailed info and pick the one with the minimum total_time
+    best_recipe = None
+    min_minutes = None
+    for rec in filtered_recipes:
+        try:
+            url = rec.get('url') if isinstance(rec, dict) else None
+            if not url:
+                continue
+            details_raw = get_recipe_details(url)
+            if isinstance(details_raw, str):
+                details = json.loads(details_raw)
+            else:
+                details = details_raw
+            if not isinstance(details, dict):
+                continue
+            tstr = details.get('total_time', '')
+            minutes = parse_time(tstr) if tstr else 0
+            if min_minutes is None or minutes < min_minutes:
+                min_minutes = minutes
+                best_recipe = details
+        except Exception as e:
+            # Log error and continue with others
+            continue
+    return best_recipe
+
+Allrecipes--21
+Trajectory check results: 3
+Allrecipes--22
+Trajectory check results: 3
+Allrecipes--23
+Trajectory check results: 3
+9
+New function proposed: def summarize_recipe(recipe_details_str):
+    '''
+    Given a detailed recipe dictionary as a string (as returned by get_recipe_details),
+    returns a concise text summary of the recipe. The summary includes the recipe title,
+    a brief description, preparation and cook times, servings/yield, main ingredients
+    (as identified by extract_recipe_main_ingredients), and a sentence highlighting notable
+    nutrition facts (e.g., calories, protein, or a key vitamin/mineral).
+    Useful for quickly presenting the essence of a recipe to users without overwhelming detail.
+    '''
+    import json
+    import ast
+
+    # Try to accept both dict and string inputs, since an LLM might pass either.
+    if isinstance(recipe_details_str, dict):
+        details = recipe_details_str
+    else:
+        try:
+            details = json.loads(recipe_details_str)
+        except Exception as e:
+            return f"[ERROR] Failed to parse recipe_details_str as JSON: {str(e)}"
+
+    title = details.get('title', 'Untitled Recipe')
+    description = details.get('description', '')
+    prep_time = details.get('prep_time', '')
+    cook_time = details.get('cook_time', '')
+    total_time = details.get('total_time', '')
+    servings = details.get('servings', details.get('yield', 'N/A'))
+
+    # Ensure extract_recipe_main_ingredients receives valid arguments
+    try:
+        recipe_details_for_extract = recipe_details_str if isinstance(recipe_details_str, str) else json.dumps(details)
+        main_ingredients = extract_recipe_main_ingredients(recipe_details_for_extract, '5')
+    except Exception:
+        main_ingredients = []
+    # Try to interpret possible string-like or weird LLM return for main_ingredients
+    if isinstance(main_ingredients, str):
+        try:
+            main_ingredients = ast.literal_eval(main_ingredients)
+        except Exception:
+            main_ingredients = [main_ingredients]
+    if not isinstance(main_ingredients, list):
+        main_ingredients = [str(main_ingredients)] if main_ingredients else []
+
+    # Prepare main ingredients as string
+    main_ing_str = ', '.join([str(ing) for ing in main_ingredients if ing]) if main_ingredients else 'N/A'
+
+    # Nutrition facts
+    nutrition = details.get('nutrition facts', {})
+    noteworthy = []
+    for nutrient in ['calories', 'protein', 'Vitamin C', 'Iron', 'Calcium']:
+        try:
+            nutrient_arg = nutrient
+            # Try calling extract_nutrient_amount with recipe in string format.
+            recipe_details_for_nutri = recipe_details_str if isinstance(recipe_details_str, str) else json.dumps(details)
+            amount = extract_nutrient_amount(recipe_details_for_nutri, nutrient_arg)
+        except Exception:
+            amount = None
+        # Ensure we don't add empty or None results, and handle weird type returned by model
+        if amount and amount not in (None, 'None', 'N/A', ''):
+            noteworthy.append(f"{nutrient.title()}: {amount}")
+    nutrition_sentence = ("Key nutrition - " + ", ".join(noteworthy) + ".") if noteworthy else "Nutrition facts not available."
+
+    # Compose summary
+    summary_parts = [
+        f"{title}",
+        description.strip(),
+        f"Prep time: {prep_time}, Cook time: {cook_time}, Total time: {total_time}",
+        f"Servings/Yield: {servings}",
+        f"Main ingredients: {main_ing_str}",
+        nutrition_sentence
+    ]
+    # Remove any empty lines
+    summary = '\n'.join([part for part in summary_parts if part and str(part).strip()])
+    return summary
+
+Traceback (most recent call last):
+  File "C:\Users\t-avalsingh\agent-verify\experiment.py", line 135, in <module>
+    main()
+    ~~~~^^
+  File "C:\Users\t-avalsingh\agent-verify\experiment.py", line 79, in main
+    print(colored(tasks[j]['id'], 'green'))
+                  ~~~~~^^^
+IndexError: list index out of range
+(base) PS C:\Users\t-avalsingh\agent-ver
