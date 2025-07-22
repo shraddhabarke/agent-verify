@@ -1,0 +1,109 @@
+[
+    {
+        "index": 0,
+        "role": "system",
+        "content": "# Retail agent policy\n\nAs a retail agent, you can help users cancel or modify pending orders, return or exchange delivered orders, modify their default user address, or provide information about their own profile, orders, and related products.\n\n- At the beginning of the conversation, you have to authenticate the user identity by locating their user id via email, or via name + zip code. This has to be done even when the user already provides the user id.\n\n- Once the user has been authenticated, you can provide the user with information about order, product, profile information, e.g. help the user look up order id.\n\n- You can only help one user per conversation (but you can handle multiple requests from the same user), and must deny any requests for tasks related to any other user.\n\n- Before taking consequential actions that update the database (cancel, modify, return, exchange), you have to list the action detail and obtain explicit user confirmation (yes) to proceed.\n\n- You should not make up any information or knowledge or procedures not provided from the user or the tools, or give subjective recommendations or comments.\n\n- You should at most make one tool call at a time, and if you take a tool call, you should not respond to the user at the same time. If you respond to the user, you should not make a tool call.\n\n- You should transfer the user to a human agent if and only if the request cannot be handled within the scope of your actions.\n\n## Domain basic\n\n- All times in the database are EST and 24 hour based. For example \"02:30:00\" means 2:30 AM EST.\n\n- Each user has a profile of its email, default address, user id, and payment methods. Each payment method is either a gift card, a paypal account, or a credit card.\n\n- Our retail store has 50 types of products. For each type of product, there are variant items of different options. For example, for a 't shirt' product, there could be an item with option 'color blue size M', and another item with option 'color red size L'.\n\n- Each product has an unique product id, and each item has an unique item id. They have no relations and should not be confused.\n\n- Each order can be in status 'pending', 'processed', 'delivered', or 'cancelled'. Generally, you can only take action on pending or delivered orders.\n\n- Exchange or modify order tools can only be called once. Be sure that all items to be changed are collected into a list before making the tool call!!!\n\n## Cancel pending order\n\n- An order can only be cancelled if its status is 'pending', and you should check its status before taking the action.\n\n- The user needs to confirm the order id and the reason (either 'no longer needed' or 'ordered by mistake') for cancellation.\n\n- After user confirmation, the order status will be changed to 'cancelled', and the total will be refunded via the original payment method immediately if it is gift card, otherwise in 5 to 7 business days.\n\n## Modify pending order\n\n- An order can only be modified if its status is 'pending', and you should check its status before taking the action.\n\n- For a pending order, you can take actions to modify its shipping address, payment method, or product item options, but nothing else.\n\n### Modify payment\n\n- The user can only choose a single payment method different from the original payment method.\n\n- If the user wants the modify the payment method to gift card, it must have enough balance to cover the total amount.\n\n- After user confirmation, the order status will be kept 'pending'. The original payment method will be refunded immediately if it is a gift card, otherwise in 5 to 7 business days.\n\n### Modify items\n\n- This action can only be called once, and will change the order status to 'pending (items modifed)', and the agent will not be able to modify or cancel the order anymore. So confirm all the details are right and be cautious before taking this action. In particular, remember to remind the customer to confirm they have provided all items to be modified.\n\n- For a pending order, each item can be modified to an available new item of the same product but of different product option. There cannot be any change of product types, e.g. modify shirt to shoe.\n\n- The user must provide a payment method to pay or receive refund of the price difference. If the user provides a gift card, it must have enough balance to cover the price difference.\n\n## Return delivered order\n\n- An order can only be returned if its status is 'delivered', and you should check its status before taking the action.\n\n- The user needs to confirm the order id, the list of items to be returned, and a payment method to receive the refund.\n\n- The refund must either go to the original payment method, or an existing gift card.\n\n- After user confirmation, the order status will be changed to 'return requested', and the user will receive an email regarding how to return items.\n\n## Exchange delivered order\n\n- An order can only be exchanged if its status is 'delivered', and you should check its status before taking the action. In particular, remember to remind the customer to confirm they have provided all items to be exchanged.\n\n- For a delivered order, each item can be exchanged to an available new item of the same product but of different product option. There cannot be any change of product types, e.g. modify shirt to shoe.\n\n- The user must provide a payment method to pay or receive refund of the price difference. If the user provides a gift card, it must have enough balance to cover the price difference.\n\n- After user confirmation, the order status will be changed to 'exchange requested', and the user will receive an email regarding how to return items. There is no need to place a new order.\n",
+        "task": "You are Isabella Johansson, and you live in 32286. You have an order sent to Texas by accident, and you want to know the tracking number of the order, and return all items in it except the pet bed. You want the refund to your amex credit card, and if the agent cannot help, transfer to a human. You don't remember the order number. It is urgent."
+    },
+    {
+        "index": 1,
+        "role": "user",
+        "content": "Hi, I need some help with an order issue. Can you assist me?"
+    },
+    {
+        "index": 2,
+        "role": "assistant",
+        "content": "Of course! I'd be happy to assist you with your order issue. To get started, I need to authenticate your identity. Could you please provide either your email address or your full name and zip code?"
+    },
+    {
+        "index": 3,
+        "role": "user",
+        "content": "Sure, my name is Isabella Johansson, and my zip code is 32286."
+    },
+    {
+        "index": 4,
+        "role": "tool",
+        "function": "find_user_id_by_name_zip",
+        "response": "isabella_johansson_2152"
+    },
+    {
+        "index": 5,
+        "role": "assistant",
+        "content": "Thank you, Isabella. I have successfully authenticated your identity. How can I assist you with your order issue today?"
+    },
+    {
+        "index": 6,
+        "role": "user",
+        "content": "I ordered something, but it was sent to Texas by mistake instead of to me. Can you help me with that?"
+    },
+    {
+        "index": 7,
+        "role": "tool",
+        "function": "get_user_details",
+        "response": "{\"name\": {\"first_name\": \"Isabella\", \"last_name\": \"Johansson\"}, \"address\": {\"address1\": \"313 Chestnut Street\", \"address2\": \"Suite 537\", \"city\": \"Jacksonville\", \"country\": \"USA\", \"state\": \"FL\", \"zip\": \"32286\"}, \"email\": \"isabella.johansson9391@example.com\", \"payment_methods\": {\"paypal_3024827\": {\"source\": \"paypal\", \"id\": \"paypal_3024827\"}}, \"orders\": [\"#W3792453\", \"#W7181492\", \"#W5565470\", \"#W2575533\"]}"
+    },
+    {
+        "index": 8,
+        "role": "tool",
+        "function": "get_order_details",
+        "response": "{\"order_id\": \"#W3792453\", \"user_id\": \"isabella_johansson_2152\", \"address\": {\"address1\": \"313 Chestnut Street\", \"address2\": \"Suite 537\", \"city\": \"Jacksonville\", \"country\": \"USA\", \"state\": \"FL\", \"zip\": \"32286\"}, \"items\": [{\"name\": \"Skateboard\", \"product_id\": \"1968349452\", \"item_id\": \"4293355847\", \"price\": 200.8, \"options\": {\"deck material\": \"bamboo\", \"length\": \"31 inch\", \"design\": \"plain\"}}], \"fulfillments\": [{\"tracking_id\": [\"908856694334\"], \"item_ids\": [\"4293355847\"]}], \"status\": \"delivered\", \"payment_history\": [{\"transaction_type\": \"payment\", \"amount\": 200.8, \"payment_method_id\": \"paypal_3024827\"}]}"
+    },
+    {
+        "index": 9,
+        "role": "tool",
+        "function": "get_order_details",
+        "response": "{\"order_id\": \"#W7181492\", \"user_id\": \"isabella_johansson_2152\", \"address\": {\"address1\": \"313 Chestnut Street\", \"address2\": \"Suite 537\", \"city\": \"Jacksonville\", \"country\": \"USA\", \"state\": \"FL\", \"zip\": \"32286\"}, \"items\": [{\"name\": \"Garden Hose\", \"product_id\": \"6679515468\", \"item_id\": \"5753502325\", \"price\": 96.35, \"options\": {\"length\": \"25ft\", \"material\": \"rubber\", \"color\": \"green\"}}, {\"name\": \"Backpack\", \"product_id\": \"2524789262\", \"item_id\": \"9851293632\", \"price\": 193.38, \"options\": {\"color\": \"green\", \"size\": \"small\", \"material\": \"polyester\", \"compartment\": \"camera\"}}, {\"name\": \"Bookshelf\", \"product_id\": \"8600330539\", \"item_id\": \"3778705663\", \"price\": 473.48, \"options\": {\"material\": \"metal\", \"color\": \"black\", \"height\": \"6 ft\"}}, {\"name\": \"Hiking Boots\", \"product_id\": \"7363354090\", \"item_id\": \"8118291112\", \"price\": 260.56, \"options\": {\"size\": \"12\", \"material\": \"leather\", \"waterproof\": \"no\"}}, {\"name\": \"Coffee Maker\", \"product_id\": \"7996920482\", \"item_id\": \"3020722515\", \"price\": 238.64, \"options\": {\"color\": \"black\", \"capacity\": \"1 cup\", \"type\": \"french press\", \"features\": \"auto shutoff\"}}], \"fulfillments\": [{\"tracking_id\": [\"418708581751\"], \"item_ids\": [\"5753502325\", \"9851293632\", \"3778705663\", \"8118291112\", \"3020722515\"]}], \"status\": \"delivered\", \"payment_history\": [{\"transaction_type\": \"payment\", \"amount\": 1262.41, \"payment_method_id\": \"paypal_3024827\"}]}"
+    },
+    {
+        "index": 10,
+        "role": "tool",
+        "function": "get_order_details",
+        "response": "{\"order_id\": \"#W5565470\", \"user_id\": \"isabella_johansson_2152\", \"address\": {\"address1\": \"812 Cedar Avenue\", \"address2\": \"Suite 500\", \"city\": \"Houston\", \"country\": \"USA\", \"state\": \"TX\", \"zip\": \"77129\"}, \"items\": [{\"name\": \"Electric Kettle\", \"product_id\": \"1075968781\", \"item_id\": \"7602931732\", \"price\": 153.25, \"options\": {\"capacity\": \"1L\", \"material\": \"stainless steel\", \"color\": \"black\"}}, {\"name\": \"Mechanical Keyboard\", \"product_id\": \"1656367028\", \"item_id\": \"9570044148\", \"price\": 231.37, \"options\": {\"switch type\": \"linear\", \"backlight\": \"none\", \"size\": \"full size\"}}, {\"name\": \"Pet Bed\", \"product_id\": \"2747247837\", \"item_id\": \"6857426243\", \"price\": 196.53, \"options\": {\"size\": \"medium\", \"material\": \"fleece\", \"color\": \"grey\"}}], \"fulfillments\": [{\"tracking_id\": [\"907614527588\"], \"item_ids\": [\"7602931732\", \"9570044148\", \"6857426243\"]}], \"status\": \"delivered\", \"payment_history\": [{\"transaction_type\": \"payment\", \"amount\": 581.15, \"payment_method_id\": \"paypal_3024827\"}]}"
+    },
+    {
+        "index": 11,
+        "role": "assistant",
+        "content": "It seems that one of your orders, #W5565470, was delivered to an address in Houston, Texas, instead of your default address in Jacksonville, Florida. This order includes the following items:\n\n1. Electric Kettle (1L, stainless steel, black)\n2. Mechanical Keyboard (linear switch, no backlight, full size)\n3. Pet Bed (medium, fleece, grey)\n\nWould you like to request an exchange or return for this order, or is there something else you'd like me to assist with?"
+    },
+    {
+        "index": 12,
+        "role": "user",
+        "content": "I don\u2019t have the order number handy, but that sounds like my order. Could you tell me the tracking number for it?"
+    },
+    {
+        "index": 13,
+        "role": "assistant",
+        "content": "The tracking number for order #W5565470 is **907614527588**. Is there anything else you'd like assistance with regarding this order?"
+    },
+    {
+        "index": 14,
+        "role": "user",
+        "content": "Yes, I'd like to initiate a return for everything in the order except the pet bed. Can you help me with that?"
+    },
+    {
+        "index": 15,
+        "role": "assistant",
+        "content": "To initiate a return for the Electric Kettle and the Mechanical Keyboard from order #W5565470, I need to confirm the following details with you:\n\n1. The refund will be processed to your original payment method (PayPal) unless you'd prefer it to go to an existing gift card.\n2. You will receive an email with instructions on how to return the items.\n\nCould you confirm if you'd like the refund to go to your PayPal account or a gift card? Once confirmed, I'll proceed with the return request."
+    },
+    {
+        "index": 16,
+        "role": "user",
+        "content": "Actually, I\u2019d like the refund to go to my Amex credit card. Can you do that instead?"
+    },
+    {
+        "index": 17,
+        "role": "assistant",
+        "content": "Currently, refunds can only be processed to the original payment method (PayPal) or an existing gift card. Unfortunately, I cannot process the refund to a different credit card.\n\nWould you like the refund to go to your PayPal account or an existing gift card? Let me know how you'd like to proceed!"
+    },
+    {
+        "index": 18,
+        "role": "user",
+        "content": "If that's the case, could you transfer me to a human agent? This is pretty urgent."
+    },
+    {
+        "index": 19,
+        "role": "tool",
+        "function": "transfer_to_human_agents",
+        "response": "Transfer successful"
+    }
+]
